@@ -1,4 +1,2 @@
 # 2020_FTP-klijent-server-implementacija
-Prenos fajlova izmedju klijenata i servera. Implementacija FTP protokola sa prosirenim funkcionalnostima kao na primer AES 128-bit enkripcija. Komunikacija se vrsi pomocu objekata 
-koji se serijalizuju i enkriptuju, i ako je potrebno salje se ili preuzima fajl koji je takodje enkriptovan radi sprecavanja kradje podataka. Korisnicki interfejs je implementiran 
-samo na klijentskoj strani, takodje sadrzi UNIX-style terminal za direktno izvrsavanje FTP komandi.
+Prenos fajlova izmedju klijenata i servera, kreiranje i brisanje foldera i fajlova kao i ostale FTP komande. Implementacija FTP protokola je u Javi sa prosirenim funkcionalnostima kao na primer AES 128-bit enkripcija. Komunikacija se vrsi pomocu objekata koji se serijalizuju i enkriptuju, i ako je potrebno salje se ili preuzima fajl koji je takodje enkriptovan radi sprecavanja kradje podataka. Kljuc za enrkripciju se salje prilikom uspesne konekcije na server koja se vrsi slanjem login podataka prilikom ostvarivanja same konekcije. Korisnicki interfejs je implementiran samo na klijentskoj strani, takodje sadrzi UNIX-style terminal za direktno izvrsavanje FTP komandi.
