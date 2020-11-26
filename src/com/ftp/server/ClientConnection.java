@@ -13,19 +13,10 @@ import java.util.Objects;
  * @author Stefan
  */
 public class ClientConnection {
-    private String username;
-    private String password;
-    private Socket socket;
+    private final String username;
+    private final String password;
+    private final Socket socket;
     private byte[] key;
-    private InputStream inStream = null;
-    private OutputStream outStream = null;
-
-    public ClientConnection(String username, String password, Socket socket, byte[] key) {
-        this.username = username;
-        this.password = password;
-        this.socket = socket;
-        this.key = key;
-    }
 
     public ClientConnection(String username, String password, Socket socket) {
         this.username = username;
@@ -33,13 +24,6 @@ public class ClientConnection {
         this.socket = socket;
     }
 
-    public String getUsername() {
-        return username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
 
     public InputStream getInStream() {
         try {
@@ -71,10 +55,6 @@ public class ClientConnection {
         return socket;
     }
 
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
-
     public String getClientIP() {
         return socket.getRemoteSocketAddress().toString();
     }
@@ -93,13 +73,4 @@ public class ClientConnection {
         return Objects.hash(username, password);
     }
 
-    @Override
-    public String toString() {
-        return "ClientConnection{" +
-                "username='" + username + '\'' +
-                ", password='" + password + '\'' +
-                ", inStream=" + inStream +
-                ", outStream=" + outStream +
-                '}';
-    }
 }

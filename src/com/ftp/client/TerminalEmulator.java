@@ -7,10 +7,8 @@ import javafx.scene.control.TreeItem;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -21,10 +19,10 @@ import java.util.List;
  */
 public class TerminalEmulator {
     private FTPClient client;
-    private TextArea console;
+    private final TextArea console;
     public static String pwd = "";
     public static TreeItem<File> treeItem;
-    private int caretPosition = 0;
+    private int caretPosition;
     private String lastCommand = "";
 
     public TerminalEmulator(FTPClient client, TextArea console) {
@@ -36,7 +34,6 @@ public class TerminalEmulator {
     /**
      * Executes command given in terminal
      *
-     * @exception Exception when command is incomplete
      */
     public void executeCommand() {
         if(client==null){
@@ -147,8 +144,8 @@ public class TerminalEmulator {
      * @return String representation of file type
      */
     public String getFileType(File file){
-        if(file.isDirectory()) return "d";
         if(Files.isSymbolicLink(file.toPath())) return "s";
+        if(file.isDirectory()) return "d";
         return "-";
     }
 

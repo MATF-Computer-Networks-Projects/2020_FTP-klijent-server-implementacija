@@ -3,13 +3,11 @@ package com.ftp.client;
 import com.ftp.file.FTPCommand;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
@@ -35,9 +33,9 @@ public class FTPClientUI extends Application {
     public static FTPClient client;
     public static String logMessage = "";
     public static ProgressBar bar = new ProgressBar(0);
-    private static TextArea log = new TextArea();
+    private static final TextArea log = new TextArea();
     private static TerminalEmulator te;
-    private static TreeView<File> treeView = new TreeView<File>(null);
+    private static final TreeView<File> treeView = new TreeView<>(null);
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -101,7 +99,7 @@ public class FTPClientUI extends Application {
             }
         });
         upload.setOnAction(e -> {
-            if (false) {
+            if (false) { //TODO 1
                 Alert a = new Alert(Alert.AlertType.WARNING);
                 a.setContentText("File not choosen! Chose file first.");
                 a.show();
@@ -148,9 +146,9 @@ public class FTPClientUI extends Application {
             console.setText(username.getText() + "@" + host.getText() + ":~$ ");
         });
         FileChooser fileChooser = new FileChooser();
-        treeView.setCellFactory(new Callback<TreeView<File>, TreeCell<File>>() {
+        treeView.setCellFactory(new Callback<>() {
             public TreeCell<File> call(TreeView<File> tv) {
-                return new TreeCell<File>() {
+                return new TreeCell<>() {
                     @Override
                     protected void updateItem(File item, boolean empty) {
                         super.updateItem(item, empty);
@@ -161,16 +159,14 @@ public class FTPClientUI extends Application {
         });
         treeView.setEditable(true);
 
-        treeView.setOnMouseClicked(new EventHandler<MouseEvent>() {
-            @Override
-            public void handle(MouseEvent event) {
-                try {
-                    TreeView<File> tree = ((TreeView<File>) event.getSource());
-                    TreeItem<File> sel = tree.getSelectionModel().getSelectedItem();
-                    selectedFolder = sel.getValue().isDirectory()?sel:sel.getParent();
-                    selected = sel.getValue();
-                } catch (Exception e) {
-                }
+        treeView.setOnMouseClicked(event -> {
+            try {
+                @SuppressWarnings("unchecked")
+                TreeView<File> tree = ((TreeView<File>) event.getSource());
+                TreeItem<File> sel = tree.getSelectionModel().getSelectedItem();
+                selectedFolder = sel.getValue().isDirectory()?sel:sel.getParent();
+                selected = sel.getValue();
+            } catch (Exception ignored) {
             }
         });
         HBox treeAndLog = new HBox(treeView, log, actions);
@@ -246,9 +242,7 @@ public class FTPClientUI extends Application {
     }
 
     public static void updateBar(double percentage) {
-        Platform.runLater(() -> {
-            bar.setProgress(percentage);
-        });
+        Platform.runLater(() -> bar.setProgress(percentage));
     }
 
     public static FTPClient getClient() {

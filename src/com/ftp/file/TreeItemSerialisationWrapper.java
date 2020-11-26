@@ -76,12 +76,4 @@ public class TreeItemSerialisationWrapper<T extends Serializable> implements Ser
     private Object readResolve() throws ObjectStreamException {
         return item;
     }
-
-    public TreeItem<T> getItem() {
-        return item;
-    }
-
-    public void setItem(TreeItem<T> item) {
-        this.item = item;
-    }
 }

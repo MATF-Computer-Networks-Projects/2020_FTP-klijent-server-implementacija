@@ -12,11 +12,11 @@ import java.io.Serializable;
  * @author Stefan
  */
 public class FTPTransferObject implements Serializable {
-    private String username;
-    private String password;
-    private FTPCommand command;
-    private Integer responseCode;
-    private String responseMessage;
+    private final String username;
+    private final String password;
+    private final FTPCommand command;
+    private final Integer responseCode;
+    private final String responseMessage;
     private long fileSize;
     private String name;
     private File pathClient;
@@ -32,44 +32,12 @@ public class FTPTransferObject implements Serializable {
         this.additionalData = additionalData;
     }
 
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
     public FTPCommand getCommand() {
         return command;
     }
 
-    public void setCommand(FTPCommand command) {
-        this.command = command;
-    }
-
-    public Integer getResponseCode() {
-        return responseCode;
-    }
-
-    public void setResponseCode(Integer responseCode) {
-        this.responseCode = responseCode;
-    }
-
     public String getResponseMessage() {
         return responseMessage;
-    }
-
-    public void setResponseMessage(String responseMessage) {
-        this.responseMessage = responseMessage;
     }
 
     public long getFileSize() {

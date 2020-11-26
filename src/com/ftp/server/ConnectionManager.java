@@ -19,27 +19,4 @@ public class ConnectionManager {
         clients.add(client);
     }
 
-    public void removeClient(ClientConnection client) {
-        for (int i = 0; i < clients.size(); i++) {
-            if (clients.get(i).equals(client)) {
-                clients.remove(i);
-                return;
-            }
-        }
-    }
-
-    public ClientConnection getClient(String username, String password) {
-        for (ClientConnection c : clients) {
-            if (c.getUsername().equals(username) && c.getPassword().equals(password)) return c;
-        }
-        return null;
-    }
-
-    public List<ClientConnection> getClients() {
-        return clients;
-    }
-
-    public void setClients(List<ClientConnection> clients) {
-        this.clients = clients;
-    }
 }

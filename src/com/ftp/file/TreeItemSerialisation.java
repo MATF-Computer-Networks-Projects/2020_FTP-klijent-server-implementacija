@@ -3,7 +3,6 @@ package com.ftp.file;
 import javafx.scene.control.TreeItem;
 
 import java.io.*;
-import java.util.Arrays;
 
 /**
  * This class contains static methods for serializing and deserializing {@link TreeItem} because it is not serializable by default.
@@ -36,7 +35,7 @@ public class TreeItemSerialisation {
      */
     public static byte[] serialize(TreeItem<File> root){
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutputStream oos = null;
+        ObjectOutputStream oos;
         try{
             oos=new ObjectOutputStream(bos);
             oos.writeObject(new TreeItemSerialisationWrapper(root));
