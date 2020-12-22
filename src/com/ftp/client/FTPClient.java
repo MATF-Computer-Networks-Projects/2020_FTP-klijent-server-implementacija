@@ -1,15 +1,14 @@
 package com.ftp.client;
 
-import com.ftp.file.AES;
-import com.ftp.file.FTPCommand;
-import com.ftp.file.FTPTransferObject;
-import com.ftp.file.TreeItemSerialisation;
+import com.ftp.file.*;
 import javafx.scene.control.TreeItem;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Random;
 
 /**
  * This is basic class that represents client connecting to remote {@link com.ftp.server.FTPServer}. It uses {@link Socket}
@@ -49,12 +48,14 @@ public class FTPClient {
             socket = new Socket(host, port);
             inStream = socket.getInputStream();
             outStream = socket.getOutputStream();
-            outStream.write((username + ":" + password).getBytes());
+            generateKey();
+            System.out.println("KEY "+key);
+            byte[] toSend=Objects.requireNonNull(AES.encrypt((username + ":" + password).getBytes(StandardCharsets.UTF_8), key));
+            DataOutputStream dos=new DataOutputStream(outStream);
+            dos.writeInt(toSend.length);
+            dos.flush();
+            outStream.write(toSend);
             outStream.flush();
-            byte[] keyByte=new byte[16];
-            int i=inStream.read(keyByte,0,16);
-            if(i==0) return; //TODO 1
-            key=new String(keyByte);
             readFromSocket();
         } catch (IOException u) {
             FTPClientUI.addToLog(u.getMessage());
@@ -140,7 +141,7 @@ public class FTPClient {
         byte[] objBytes = AES.encrypt(bos.toByteArray(),key);
         synchronized (socket) {
             assert objBytes != null;
-            outStream.write(Arrays.copyOf((objBytes.length + "").getBytes(), 16), 0, 16);
+            outStream.write(Arrays.copyOf((objBytes.length + "").getBytes(StandardCharsets.UTF_8), 16), 0, 16);
             outStream.write(objBytes);
         }
     }
@@ -189,11 +190,12 @@ public class FTPClient {
         byte[] b = new byte[16];
         num = inStream.read(b, 0, 16);
         if(num==0) return null; //TODO 1
-        int size = Integer.parseInt((new String(b)).trim());
+        int size = Integer.parseInt((new String(b,StandardCharsets.UTF_8)).trim());
         System.out.println("READED SIZE " + size);
         objInputArray = new byte[size];
         num = inStream.read(objInputArray, 0, size);
         if(num==0) return null; //TODO 1
+        System.out.println("DECRYPT KEY\""+key+"\"");
         ByteArrayInputStream bis = new ByteArrayInputStream(Objects.requireNonNull(AES.decrypt(objInputArray, key)));
         ObjectInput in = new ObjectInputStream(bis);
         readObject = (FTPTransferObject) in.readObject();
@@ -235,6 +237,20 @@ public class FTPClient {
             bos.flush();
             bos.close();
         }
+    }
+
+    public void generateKey(){
+        KeyGenerator keyGenerator=new KeyGenerator(new Random().nextInt()+1);
+        try {
+            DataInputStream fromServer=new DataInputStream(socket.getInputStream());
+            DataOutputStream toServer=new DataOutputStream(socket.getOutputStream());
+            keyGenerator.setReceivedCode(fromServer.readLong());
+            toServer.writeLong(keyGenerator.getCodeToSend());
+            toServer.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        this.key=keyGenerator.getFinalCode()+"";
     }
 
     /**

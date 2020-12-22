@@ -16,7 +16,7 @@ public class ClientConnection {
     private final String username;
     private final String password;
     private final Socket socket;
-    private byte[] key;
+    private String key;
 
     public ClientConnection(String username, String password, Socket socket) {
         this.username = username;
@@ -43,11 +43,11 @@ public class ClientConnection {
         return null;
     }
 
-    public byte[] getKey() {
+    public String getKey() {
         return key;
     }
 
-    public void setKey(byte[] key) {
+    public void setKey(String key) {
         this.key = key;
     }
 

@@ -19,4 +19,7 @@ public class ConnectionManager {
         clients.add(client);
     }
 
+    public void removeClient(ClientConnection currentClient) {
+        clients.remove(currentClient);
+    }
 }
