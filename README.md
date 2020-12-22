@@ -1,2 +1,28 @@
 # 2020_FTP-klijent-server-implementacija
-Prenos fajlova izmedju klijenata i servera, kreiranje i brisanje foldera i fajlova kao i ostale FTP komande. Implementacija FTP protokola je u Javi sa prosirenim funkcionalnostima kao na primer AES 128-bit enkripcija umesto standardnog SSL/TLS-a. Komunikacija se vrsi pomocu objekata koji se serijalizuju i enkriptuju, i ako je potrebno salje se ili preuzima fajl koji je takodje enkriptovan radi sprecavanja kradje podataka. Kljuc za enrkripciju se salje prilikom uspesne konekcije na server koja se vrsi slanjem login podataka prilikom ostvarivanja same konekcije. Korisnicki interfejs je implementiran samo na klijentskoj strani, takodje sadrzi UNIX-style terminal za direktno izvrsavanje FTP komandi.
+Prenos fajlova izmedju klijenata i servera, kreiranje i brisanje foldera i fajlova kao i ostale FTP komande. Implementacija FTP protokola je u Javi sa prosirenim funkcionalnostima kao na primer AES 128-bit enkripcija umesto standardnog SSL/TLS-a. Komunikacija se vrsi pomocu objekata koji se serijalizuju i enkriptuju, i ako je potrebno salje se ili preuzima fajl koji je takodje enkriptovan radi sprecavanja kradje podataka. Kljuc za enrkripciju se generise nakon konekcije na server, i nakon toga klijent salje svoje ime i sifru. Korisnicki interfejs je implementiran samo na klijentskoj strani, takodje sadrzi UNIX-style terminal za direktno izvrsavanje FTP komandi.
+
+## Verzija jave potrebna za pokretanje servera/klijenta
+- Za projekat je neophodno imati jre 9.0.4 ili noviju verziju. Nisu potrebne dodatne biblioteke.<br/><br/>
+
+## Pokretanje servera i klijenta
+
+Server se pokrece tako sto se kao argument prosledi port na kome ce server raditi:
+```
+java -jar Server.jar port
+```
+To ce pokrenuti server na trenutnoj lokaciji ```jar``` fajla. Server ne sadrzi korisnicki interfejs. Klijent se pokrece bez dodatnih argumenata:
+```
+java -jar Client.jar
+```
+Nakon pokretanja pojavice se korisnicki interfejs. Moguce je izvrsavati komande i putem terminala koji sadrzi osnovne FTP i UNIX komande.<br/><br/><br/><br/>
+
+
+## Korisnicki interfejs
+
+Klijentski korisnicki interfejs se sastoji od polja za povezivanje, log, upload, pravljenje novog foldera, file explorer-a kao i UNIX terminala
+
+![](gui.png)
+
+Nakon uspesne konekcije ucitava se file explorer sa folderima i fajlovima na serveru. Desni klik na fajl/folder otvara meni pomocu koga mozemo da skinemo fajl, da ga obrisemo i da vidimo detalje. Pravljenje novog foldera se vrsi unosenjem imena na desnoj strani i biranja lokacije gde ce se folder kreirati. Upload se vrsi tako sto se izabere fajl sa lokalnog racunara i biranjem lokacije na serveru gde ce se fajl nalaziti.
+
+![](gui2.png)
