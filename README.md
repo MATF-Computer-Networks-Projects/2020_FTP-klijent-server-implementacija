@@ -10,7 +10,7 @@ Server se pokrece tako sto se kao argument prosledi port na kome ce server radit
 ```
 java -jar Server.jar port
 ```
-To ce pokrenuti server na trenutnoj lokaciji ```jar``` fajla. Server ne sadrzi korisnicki interfejs. Klijent se pokrece bez dodatnih argumenata:
+To ce pokrenuti server na trenutnoj lokaciji ```jar``` fajla, sto ce ujedno biti root folder servera. Server ne sadrzi korisnicki interfejs. Klijent se pokrece bez dodatnih argumenata:
 ```
 java -jar Client.jar
 ```
