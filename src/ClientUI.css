@@ -1,4 +1,6 @@
 .text-area {
+    -fx-background-insets: 0;
+    -fx-background-color: transparent;
     -fx-font-family: Consolas;
     -fx-font-size: 15;
     -fx-text-fill: #ffffff;

@@ -3,21 +3,25 @@ package com.ftp.client;
 import com.ftp.file.FTPCommand;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.util.Callback;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.util.Date;
 import java.util.Properties;
 
 /**
@@ -29,10 +33,13 @@ import java.util.Properties;
  */
 public class FTPClientUI extends Application {
     public File selected = null;
+    double xOffset;
+    double yOffset;
     public static TreeItem<File> selectedFolder;
     public static FTPClient client;
     public static String logMessage = "";
     public static ProgressBar bar = new ProgressBar(0);
+    public static Label speed=new Label();
     private static final TextArea log = new TextArea();
     private static TerminalEmulator te;
     private static final TreeView<File> treeView = new TreeView<>(null);
@@ -50,20 +57,26 @@ public class FTPClientUI extends Application {
         PasswordField password = new PasswordField();
         Button connect = new Button("Connect");
         Button upload = new Button("Upload");
-        Button download = new Button("Download");
         Button mkdir = new Button("Create folder");
-        Button rmdir = new Button("Delete folder/file");
         CheckBox rememberMe = new CheckBox("Remember me");
         TextArea console = new TextArea();
+        HBox titleBar=new HBox(10);
+        titleBar.setAlignment(Pos.TOP_RIGHT);
+        titleBar.setPadding(new Insets(0,0,20,0));
+        Button x=new Button("X");
+        Button mm=new Button("_");
+        titleBar.getChildren().addAll(mm,x);
         console.appendText(System.getProperty("user.name") + "@localhost:~$ ");
         TextField newFolder = new TextField();
         TextField pathToFile = new TextField();
         bar.setPadding(new Insets(10));
         pathToFile.setEditable(false);
-        VBox actions = new VBox(download, newFolder, mkdir, rmdir);
+        VBox actions = new VBox(newFolder, mkdir);
+        actions.setAlignment(Pos.CENTER);
         actions.setPadding(new Insets(10));
         actions.setSpacing(10);
         HBox hBox = new HBox(lbHost, host, lbPort, port, lbUsername, username, lbPassword, password, connect);
+        hBox.setAlignment(Pos.CENTER);
         hBox.setSpacing(10);
         hBox.setPadding(new Insets(10));
         te = new TerminalEmulator(client, console);
@@ -78,25 +91,12 @@ public class FTPClientUI extends Application {
             port.setText(props.get("port").toString());
             rememberMe.setSelected(true);
         }
-        rmdir.setOnAction(e -> {
-            if (selected == null) {
-                Alert a = new Alert(Alert.AlertType.WARNING);
-                a.setContentText("Folder/file not selected! Select file/folder first.");
-                a.show();
-            } else {
-                addToLog("Removing selected file/folder...\n");
-                client.writeToSocket(null, selected, FTPCommand.RMDIR);
-            }
+        x.setOnAction(e->{
+            System.exit(0);
         });
-        download.setOnAction(e -> {
-            if (selected == null) {
-                Alert a = new Alert(Alert.AlertType.WARNING);
-                a.setContentText("Folder/file not selected! Select file/folder first.");
-                a.show();
-            } else {
-                addToLog("Downloading " + selected.getName() + "...\n");
-                client.writeToSocket(null, selected, FTPCommand.GET);
-            }
+        mm.setOnAction(e->{
+            Stage obj = (Stage) primaryStage.getScene().getWindow();
+            obj.setIconified(true);
         });
         upload.setOnAction(e -> {
             if (false) { //TODO 1
@@ -170,20 +170,32 @@ public class FTPClientUI extends Application {
             }
         });
         HBox treeAndLog = new HBox(treeView, log, actions);
+        treeAndLog.setAlignment(Pos.CENTER);
         treeAndLog.setSpacing(10);
         treeAndLog.setPadding(new Insets(10));
+        treeAndLog.setMaxHeight(300);
         Button selectFile = new Button("Select File");
         selectFile.setOnAction(e -> {
             File selectedFile = fileChooser.showOpenDialog(primaryStage);
             pathToFile.setText(selectedFile.getAbsolutePath());
         });
+        HBox selectUpload=new HBox(10);
+        selectUpload.getChildren().addAll(selectFile,upload);
         TabPane tabPane = new TabPane();
         Tab terminal1 = new Tab("Terminal 1", console);
         tabPane.getTabs().add(terminal1);
-        VBox vBox = new VBox(hBox, rememberMe, bar, treeAndLog, pathToFile, selectFile, upload, tabPane);
+        selectUpload.setPadding(new Insets(0,0,10,0));
+        VBox fileUpload=new VBox(10);
+        fileUpload.getChildren().addAll(pathToFile,selectUpload);
+        HBox progress=new HBox(10);
+        speed.setMinWidth(150);
+        speed.setMaxWidth(150);
+        progress.getChildren().addAll(bar,speed);
+        VBox vBox = new VBox(titleBar, hBox, rememberMe, progress, treeAndLog, fileUpload, tabPane);
+        vBox.setAlignment(Pos.CENTER);
         treeView.setMaxHeight(400);
         treeView.setMaxWidth(300);
-        vBox.setPadding(new Insets(10));
+        vBox.setPadding(new Insets(20));
         Scene scene = new Scene(vBox, 960, 600);
         console.getStylesheets().add("ClientUI.css");
         console.setOnKeyPressed(e -> {
@@ -212,7 +224,61 @@ public class FTPClientUI extends Application {
                 e.consume();
             }
         });
-        bar.setMinWidth(scene.getWidth() - 20 - newFolder.getWidth());
+        scene.setOnMousePressed(new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                xOffset = primaryStage.getX() - event.getScreenX();
+                yOffset = primaryStage.getY() - event.getScreenY();
+            }
+        });
+        scene.setOnMouseDragged(new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                primaryStage.setX(event.getScreenX() + xOffset);
+                primaryStage.setY(event.getScreenY() + yOffset);
+            }
+        });
+        MenuItem downloadItem=new MenuItem("Download");
+        MenuItem deleteItem=new MenuItem("Delete");
+        MenuItem detailsItem=new MenuItem("Details");
+        downloadItem.setOnAction(e->{
+            if (selected == null) {
+                Alert a = new Alert(Alert.AlertType.WARNING);
+                a.setContentText("Folder/file not selected! Select file/folder first.");
+                a.show();
+            } else {
+                addToLog("Downloading " + selected.getName() + "...\n");
+                client.writeToSocket(null, selected, FTPCommand.GET);
+            }
+        });
+        deleteItem.setOnAction(e->{
+            if (selected == null) {
+                Alert a = new Alert(Alert.AlertType.WARNING);
+                a.setContentText("Folder/file not selected! Select file/folder first.");
+                a.show();
+            } else {
+                addToLog("Removing selected file/folder...\n");
+                client.writeToSocket(null, selected, FTPCommand.RMDIR);
+            }
+        });
+        detailsItem.setOnAction(e->{
+            Alert a = new Alert(Alert.AlertType.INFORMATION);
+            a.setTitle("Details for "+selected.getName());
+            a.setContentText("Path: "+selected.getAbsolutePath()+"\nSize: "+selected.length()+" B\nLast modified on: "+new Date(selected.lastModified()) +"\n");
+            a.show();
+        });
+        ContextMenu rootContextMenu=new ContextMenu();
+        rootContextMenu.getItems().add(downloadItem);
+        rootContextMenu.getItems().add(deleteItem);
+        rootContextMenu.getItems().add(detailsItem);
+
+        treeView.setContextMenu(rootContextMenu);
+        bar.setMinWidth(scene.getWidth() - 170 - newFolder.getWidth());
+        primaryStage.setMinHeight(800);
+        primaryStage.setMinWidth(1000);
+        scene.getStylesheets().add("MainClientUI.css");
+        scene.setFill(Color.TRANSPARENT);
+        primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
         primaryStage.show();
     }
@@ -241,8 +307,11 @@ public class FTPClientUI extends Application {
         FTPClientUI.client = client;
     }
 
-    public static void updateBar(double percentage) {
-        Platform.runLater(() -> bar.setProgress(percentage));
+    public static void updateBar(double percentage, double speed) {
+        Platform.runLater(() -> {
+            bar.setProgress(percentage);
+            FTPClientUI.speed.setText((long)speed+" B/s");
+        });
     }
 
     public static FTPClient getClient() {

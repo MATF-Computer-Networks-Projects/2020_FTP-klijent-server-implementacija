@@ -25,8 +25,10 @@ public class FTPServer {
     private String password = "";
     private FolderTreeView ftv;
     private final ConnectionManager manager;
+    private final int port;
 
-    public FTPServer() {
+    public FTPServer(int port) {
+        this.port = port;
         manager = new ConnectionManager();
     }
 
@@ -38,21 +40,21 @@ public class FTPServer {
      */
     public void createSocket() throws IOException {
         ftv = new FolderTreeView(new File(System.getProperty("user.dir")));
-        ServerSocket serverSocket = new ServerSocket(3339);
+        ServerSocket serverSocket = new ServerSocket(port);
         while (true) {
-            Socket socket=null;
+            Socket socket = null;
             ClientConnection currentClient;
             try {
                 socket = serverSocket.accept();
-                currentClient=authenticateUser(socket);
-                if(currentClient!=null){
+                currentClient = authenticateUser(socket);
+                if (currentClient != null) {
                     manager.addClient(currentClient);
                 }
             } catch (IOException io) {
                 io.printStackTrace();
                 assert socket != null;
                 socket.close();
-                System.err.println("Client has been disconnected! Error: "+io.getMessage());
+                System.err.println("Client has been disconnected! Error: " + io.getMessage());
             }
         }
 
@@ -69,41 +71,35 @@ public class FTPServer {
         Thread readThread = new Thread(() -> {
             while (client.getSocket().isConnected()) {
                 try {
-                    synchronized (client.getSocket().getInputStream()) {
-                        FTPTransferObject readObject = null;
-                        try {
-                            readObject = readObjectFromStream(client);
-                            readFileFromStream(client, readObject);
-                        } catch (IOException | ClassNotFoundException e) {
-                            e.printStackTrace();
-                        }
-                        assert readObject != null;
-                        if (readObject.getCommand().equals(FTPCommand.GET)) {
-                            writeToSocket(client, readObject.getPathServer(), FTPCommand.GET, 1, "File sent successfully");
-                        }
-                        if (readObject.getCommand().equals(FTPCommand.CLOSE)) {
-                            System.err.println("Client requested disconnect. Disconnecting "+client.getClientIP());
-                            client.getSocket().close();
-                            manager.removeClient(client);
-                            return;
-                        }
-                        if (readObject.getCommand().equals(FTPCommand.MKDIR)) {
-                            createFolder(readObject.getPathServer());
-                            writeToSocket(client, null, FTPCommand.SUCCESS, 1, "Folder created successfully");
-                        }
-                        if (readObject.getCommand().equals(FTPCommand.RMDIR)) {
-                            try {
-                                deleteFolder(readObject.getPathServer());
-                                writeToSocket(client, readObject.getPathServer(), FTPCommand.SUCCESS, 1, "Folder/file deleted successfully");
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                                writeToSocket(client, readObject.getPathServer(), FTPCommand.FAILURE, -1, "Failed to delete file/folder");
-                            }
-                        }
-                        System.out.println(readObject);
+                    FTPTransferObject readObject = readObjectFromStream(client);
+                    readFileFromStream(client, readObject);
+
+                    if (readObject.getCommand().equals(FTPCommand.GET)) {
+                        writeToSocket(client, readObject.getPathServer(), FTPCommand.GET, 1, "File sent successfully");
                     }
-                } catch (Exception e) {
-                    System.err.println("Client "+client.getClientIP()+" disconnected.");
+                    if (readObject.getCommand().equals(FTPCommand.CLOSE)) {
+                        System.err.println("Client requested disconnect. Disconnecting " + client.getClientIP());
+                        client.getSocket().close();
+                        manager.removeClient(client);
+                        return;
+                    }
+                    if (readObject.getCommand().equals(FTPCommand.MKDIR)) {
+                        createFolder(readObject.getPathServer());
+                        writeToSocket(client, null, FTPCommand.SUCCESS, 1, "Folder created successfully");
+                    }
+                    if (readObject.getCommand().equals(FTPCommand.RMDIR)) {
+                        try {
+                            deleteFolder(readObject.getPathServer());
+                            writeToSocket(client, readObject.getPathServer(), FTPCommand.SUCCESS, 1, "Folder/file deleted successfully");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            writeToSocket(client, readObject.getPathServer(), FTPCommand.FAILURE, -1, "Failed to delete file/folder");
+                        }
+                    }
+
+                } catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                    System.err.println("Client " + client.getClientIP() + " disconnected.");
                     manager.removeClient(client);
                     try {
                         client.getSocket().close();
@@ -130,10 +126,8 @@ public class FTPServer {
     public void writeToSocket(ClientConnection client, File path, FTPCommand command, Integer response, String responseMessage) {
         Thread writeThread = new Thread(() -> {
             try {
-                Thread.sleep(100);
                 writeObjectToStream(client, null, path, command, response, responseMessage);
                 writeFileToStream(client, path, !command.equals(FTPCommand.GET));
-                client.getOutStream().flush();
             } catch (Exception e) {
                 System.err.println("Failed to send data to client. It will be disconnected");
                 try {
@@ -165,8 +159,22 @@ public class FTPServer {
         if (i == 0) return null; //TODO 1
         int size = Integer.parseInt((new String(b)).trim());
         byte[] objInputArray = new byte[size];
-        i = client.getInStream().read(objInputArray, 0, size);
-        if (i == 0) return null; //TODO 1
+        int readBytes = 0;
+        while (size - readBytes > 0) {
+            while(client.getInStream().available()<Math.min(size - readBytes, 512)){
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("WAITING ");
+            }
+            byte[] tmpArray = new byte[Math.min(size - readBytes, 512)];
+
+            client.getInStream().read(tmpArray, 0, Math.min(size - readBytes, 512));
+            System.arraycopy(tmpArray, 0, objInputArray, readBytes, tmpArray.length);
+            readBytes += 512;
+        }
         ByteArrayInputStream bis = new ByteArrayInputStream(Objects.requireNonNull(AES.decrypt(objInputArray, new String(client.getKey()))));
         ObjectInput in = new ObjectInputStream(bis);
         readedObject = (FTPTransferObject) in.readObject();
@@ -178,8 +186,8 @@ public class FTPServer {
     public void readFileFromStream(ClientConnection client, FTPTransferObject readObject) throws IOException {
         System.out.println("readFileFromStream");
         if (readObject.getFileSize() == 0) {
-            int i = client.getInStream().read(new byte[1]);//TODO 1
-            System.out.println("READED 0 FROM FILE, RETURNING: " + i);
+            //int i = client.getInStream().read(new byte[1]);//TODO 1
+            System.out.println("READED 0 FROM FILE, RETURNING: ");
             return;
         }
         BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(new File(readObject.getPathServer().getPath() + "/" + readObject.getPathClient().getName())));
@@ -188,10 +196,19 @@ public class FTPServer {
         long fileSizeEnc = ((readObject.getFileSize() / 512) + 1) * 528;
         long fileSize = readObject.getFileSize();
         while (fileSizeEnc > 0) {
+            while(client.getInStream().available()<528){
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("WAITING ");
+            }
             int num = client.getInStream().read(readBuffer, 0, 528);
             if (num <= 0) break;
             byte[] decrypted = AES.decrypt(readBuffer, new String(client.getKey()));
             assert decrypted != null;
+
             bos.write(decrypted, 0, fileSize < 512 ? (int) fileSize : decrypted.length);
             fileSizeEnc -= 528;
             fileSize -= 512;
@@ -204,7 +221,7 @@ public class FTPServer {
     public void writeFileToStream(ClientConnection client, File pathServer, boolean empty) throws IOException {
         System.out.println("writeFileToStream");
         if (empty || pathServer == null || pathServer.getPath().equals("")) {
-            client.getOutStream().write(new byte[1]);
+            //client.getOutStream().write(new byte[1]);
             System.out.println("WRITTEN 0, RETURNING");
             return;
         }
@@ -215,22 +232,20 @@ public class FTPServer {
             int bytesRead = bis.read(myBuffer, 0, 512);
             if (bytesRead == -1) break;
             size += bytesRead;
-            synchronized (client.getSocket().getOutputStream()) {
-                byte[] encrypted = AES.encrypt(myBuffer, new String(client.getKey()));
-                assert encrypted != null;
-                client.getOutStream().write(encrypted, 0, 528);
-            }
+            byte[] encrypted = AES.encrypt(myBuffer, new String(client.getKey()));
+            assert encrypted != null;
+            client.getOutStream().write(encrypted, 0, 528);
         }
+        client.getOutStream().flush();
         bis.close();
         System.out.println("FILE SENT " + size);
     }
 
     public void writeObjectToStream(ClientConnection client, File pathClient, File pathServer, FTPCommand command, Integer response, String responseMessage) throws IOException {
         System.out.println("writeObjectToStream");
-        FTPTransferObject objToSend = new FTPTransferObject(null, null, command, response, responseMessage, TreeItemSerialisation.serialize(ftv.getTreeItem()));
+        FTPTransferObject objToSend = new FTPTransferObject(null, null, command, response, responseMessage, response == -1 ? null : TreeItemSerialisation.serialize(ftv.getTreeItem()));
         objToSend.setPathClient(pathClient);
         objToSend.setPathServer(pathServer);
-        objToSend.setAdditionalData(TreeItemSerialisation.serialize(ftv.getTreeItem()));
         if (pathServer != null) {
             if (!pathServer.getName().equals(""))
                 objToSend.setName(pathServer.getName());
@@ -243,25 +258,29 @@ public class FTPServer {
             objToSend.setFileSize(pathServer.length());
         out.writeObject(objToSend);
         byte[] objBytes = AES.encrypt(bos.toByteArray(), new String(client.getKey()));
-        synchronized (client.getSocket().getOutputStream()) {
-            assert objBytes != null;
-            System.out.println("SENT SIZE " + objBytes.length);
-            client.getOutStream().write(Arrays.copyOf((objBytes.length + "").getBytes(StandardCharsets.UTF_8), 16), 0, 16);
-            client.getOutStream().write(objBytes);
+        assert objBytes != null;
+        System.out.println("SENT SIZE " + objBytes.length);
+        client.getOutStream().write(Arrays.copyOf((objBytes.length + "").getBytes(StandardCharsets.UTF_8), 16), 0, 16);
+        int sendObjectSize = 0;
+        while (objBytes.length - sendObjectSize > 0) {
+            byte[] tmpArray = Arrays.copyOfRange(objBytes, sendObjectSize, sendObjectSize + Math.min(objBytes.length - sendObjectSize, 512));
+            client.getOutStream().write(tmpArray, 0, tmpArray.length);
+            sendObjectSize += 512;
         }
+        client.getOutStream().flush();
         bos.close();
         out.close();
         System.out.println("OBJECT SIZE " + objBytes.length);
     }
 
     private String generateKey(Socket client) {
-        KeyGenerator keyGenerator = new KeyGenerator(new Random().nextInt() + 1);
+        KeyGenerator keyGenerator = new KeyGenerator(new Random().nextInt() + 10);
         try {
-            DataOutputStream toClient = new DataOutputStream(client.getOutputStream());
-            DataInputStream fromClient = new DataInputStream(client.getInputStream());
-            toClient.writeLong(keyGenerator.getCodeToSend());
-            keyGenerator.setReceivedCode(fromClient.readLong());
-            toClient.flush();
+            byte[] toSend = new byte[32];
+            client.getOutputStream().write(Arrays.copyOf(String.valueOf(keyGenerator.getCodeToSend()).getBytes(StandardCharsets.US_ASCII), 16));
+            client.getInputStream().read(toSend, 0, 32);
+            keyGenerator.setReceivedCode(Long.parseLong(new String(toSend, StandardCharsets.US_ASCII).trim()));
+            client.getOutputStream().flush();
             return keyGenerator.getFinalCode() + "";
         } catch (IOException e) {
             e.printStackTrace();
@@ -270,12 +289,12 @@ public class FTPServer {
     }
 
     private ClientConnection authenticateUser(Socket socket) throws IOException {
-        ClientConnection currentClient=null;
+        ClientConnection currentClient = null;
         InputStream inStream = socket.getInputStream();
         String genKey = generateKey(socket);
-        System.out.println("KEY " + genKey);
-        DataInputStream dis = new DataInputStream(inStream);
-        int size = dis.readInt();
+        byte[] sizeByte = new byte[32];
+        socket.getInputStream().read(sizeByte, 0, 32);
+        int size = Integer.parseInt(new String(sizeByte, StandardCharsets.US_ASCII).trim());
         byte[] fromClient = new byte[size];
         inStream.read(fromClient, 0, size);
         String[] credentials = (new String(Objects.requireNonNull(AES.decrypt(fromClient, genKey)), StandardCharsets.UTF_8)).split(":");
@@ -294,7 +313,6 @@ public class FTPServer {
         } else {
             ClientConnection client = new ClientConnection(null, null, socket);
             client.setKey(genKey);
-            client.getOutStream().write(client.getKey().getBytes(StandardCharsets.UTF_8), 0, 16);
             System.out.println("Incorrect credentials!");
             writeToSocket(client, null, FTPCommand.FAILURE, -1, "Incorrect credentials!");
         }
@@ -323,7 +341,13 @@ public class FTPServer {
     }
 
     public static void main(String[] args) throws IOException {
-        FTPServer chatServer = new FTPServer();
+        if (args.length < 1) {
+            System.err.println("Missing or invalid arugments. " + args.length);
+            return;
+        }
+        FTPServer chatServer = new FTPServer(Integer.parseInt(args[0]));
         chatServer.createSocket();
     }
+
+
 }

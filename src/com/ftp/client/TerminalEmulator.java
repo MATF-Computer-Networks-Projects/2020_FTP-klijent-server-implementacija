@@ -4,8 +4,10 @@ import com.ftp.file.FTPCommand;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TreeItem;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -105,6 +107,12 @@ public class TerminalEmulator {
             } catch (Exception e) {
                 console.appendText("Invalid option. Type connect --help for usage.");
             }
+        }else{
+            try {
+                console.appendText(execSysCommand(command));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         console.appendText("\n" + (client==null?System.getProperty("user.name"):client.getUsername()) + "@" + (client==null?"localhost":client.getHost()) + ":~" + pwd + "$ ");
         caretPosition = console.getCaretPosition();
@@ -135,6 +143,28 @@ public class TerminalEmulator {
     public String posixFilePermissions(File file){
         String perms=(file.canRead()?"r":"-")+(file.canWrite()?"w":"-")+(file.canExecute()?"x":"-");
         return getFileType(file)+perms+perms+perms;
+    }
+
+    public String execSysCommand(String command) throws IOException {
+        StringBuilder value=new StringBuilder();
+        Runtime rt = Runtime.getRuntime();
+        Process proc = rt.exec("cmd.exe /c "+command); //TODO check if windows or linux
+
+        BufferedReader stdInput = new BufferedReader(new
+                InputStreamReader(proc.getInputStream()));
+
+        BufferedReader stdError = new BufferedReader(new
+                InputStreamReader(proc.getErrorStream()));
+
+        String s = null;
+        while ((s = stdInput.readLine()) != null) {
+            value.append(s).append("\n");
+        }
+
+        while ((s = stdError.readLine()) != null) {
+            value.append(s).append("\n");
+        }
+        return value.toString();
     }
 
     /**

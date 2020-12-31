@@ -41,7 +41,6 @@ public class FTPClient {
     /**
      * This method is used for creating socket and connecting to server. On connecting it sends login credentials
      * and starts reading thread that is responsible for listening to socket and accepting {@link FTPTransferObject}.
-     *
      */
     public void createSocket() {
         try {
@@ -49,11 +48,10 @@ public class FTPClient {
             inStream = socket.getInputStream();
             outStream = socket.getOutputStream();
             generateKey();
-            System.out.println("KEY "+key);
-            byte[] toSend=Objects.requireNonNull(AES.encrypt((username + ":" + password).getBytes(StandardCharsets.UTF_8), key));
-            DataOutputStream dos=new DataOutputStream(outStream);
-            dos.writeInt(toSend.length);
-            dos.flush();
+            System.out.println("KEY " + key);
+            byte[] toSend = Objects.requireNonNull(AES.encrypt((username + ":" + password).getBytes(StandardCharsets.UTF_8), key));
+            byte[] sizeToSend = Arrays.copyOf(String.valueOf(toSend.length).getBytes(StandardCharsets.US_ASCII), 32);
+            outStream.write(sizeToSend, 0, 32);
             outStream.write(toSend);
             outStream.flush();
             readFromSocket();
@@ -67,7 +65,6 @@ public class FTPClient {
      * This method creates thread for reading from socket stream. It is called after successful connection to server.
      * Method reads {@link FTPTransferObject} from input stream, and after that reads file bytes (if there is any) or synchronization byte.
      * Tree view (server's file explorer) is updated on every change on server side.
-     *
      */
     public void readFromSocket() {
         Thread readThread = new Thread(() -> {
@@ -75,7 +72,7 @@ public class FTPClient {
                 try {
                     FTPTransferObject readObject = readObjectFromStream();
                     tree = TreeItemSerialisation.deserialize(readObject.getAdditionalData());
-                    FTPClientUI.addToLog("Server response: "+readObject.getResponseMessage()+"\n");
+                    FTPClientUI.addToLog("Server response: " + readObject.getResponseMessage() + "\n");
                     readFileFromStream(readObject);
                 } catch (IOException | ClassNotFoundException e) {
                     e.printStackTrace();
@@ -99,11 +96,9 @@ public class FTPClient {
     public void writeToSocket(File pathClient, File pathServer, FTPCommand command) {
         Thread writeThread = new Thread(() -> {
             try {
-                Thread.sleep(100);
                 writeObjectToStream(pathClient, pathServer, command);
                 writeFileToStream(pathClient, !command.equals(FTPCommand.PUT));
-                outStream.flush();
-            } catch (IOException | InterruptedException e) {
+            } catch (IOException e) {
                 FTPClientUI.addToLog(e.getMessage());
                 e.printStackTrace();
             }
@@ -138,12 +133,17 @@ public class FTPClient {
         else
             objToSend.setFileSize(pathClient.length());
         out.writeObject(objToSend);
-        byte[] objBytes = AES.encrypt(bos.toByteArray(),key);
-        synchronized (socket) {
-            assert objBytes != null;
-            outStream.write(Arrays.copyOf((objBytes.length + "").getBytes(StandardCharsets.UTF_8), 16), 0, 16);
-            outStream.write(objBytes);
+        byte[] objBytes = AES.encrypt(bos.toByteArray(), key);
+        assert objBytes != null;
+        outStream.write(Arrays.copyOf((objBytes.length + "").getBytes(StandardCharsets.UTF_8), 16), 0, 16);
+        int sendObjectSize = 0;
+        while (objBytes.length - sendObjectSize > 0) {
+            byte[] tmpArray = Arrays.copyOfRange(objBytes, sendObjectSize, sendObjectSize + Math.min(objBytes.length - sendObjectSize, 512));
+            outStream.write(tmpArray, 0, tmpArray.length);
+            sendObjectSize += 512;
         }
+        outStream.flush();
+
     }
 
     /**
@@ -156,7 +156,7 @@ public class FTPClient {
      */
     public void writeFileToStream(File pathClient, boolean empty) throws IOException {
         if (empty || pathClient == null) {
-            outStream.write(new byte[1]);
+            //outStream.write(new byte[1]);
             System.out.println("WRITTEN 0, RETURNING");
             return;
         }
@@ -166,12 +166,12 @@ public class FTPClient {
         while (true) {
             int bytesRead = bis.read(myBuffer, 0, 512);
             if (bytesRead == -1) break;
-            synchronized (outStream) {
-                byte[] encrypted=AES.encrypt(myBuffer,key);
-                assert encrypted != null;
-                outStream.write(encrypted, 0, 528);
-            }
+            byte[] encrypted = AES.encrypt(myBuffer, key);
+            assert encrypted != null;
+            outStream.write(encrypted, 0, 528);
         }
+        outStream.flush();
+
         bis.close();
     }
 
@@ -189,13 +189,31 @@ public class FTPClient {
         int num;
         byte[] b = new byte[16];
         num = inStream.read(b, 0, 16);
-        if(num==0) return null; //TODO 1
-        int size = Integer.parseInt((new String(b,StandardCharsets.UTF_8)).trim());
+        if (num == 0) return null; //TODO 1
+        int size = Integer.parseInt((new String(b, StandardCharsets.UTF_8)).trim());
         System.out.println("READED SIZE " + size);
         objInputArray = new byte[size];
-        num = inStream.read(objInputArray, 0, size);
-        if(num==0) return null; //TODO 1
-        System.out.println("DECRYPT KEY\""+key+"\"");
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        int readBytes = 0;
+        while (size - readBytes > 0) {
+            while(inStream.available()<Math.min(size - readBytes, 512)){
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("WAITING");
+            }
+            byte[] tmpArray = new byte[Math.min(size - readBytes, 512)];
+            inStream.read(tmpArray, 0, Math.min(size - readBytes, 512));
+            System.arraycopy(tmpArray, 0, objInputArray, readBytes, tmpArray.length);
+            readBytes += 512;
+        }
+
         ByteArrayInputStream bis = new ByteArrayInputStream(Objects.requireNonNull(AES.decrypt(objInputArray, key)));
         ObjectInput in = new ObjectInputStream(bis);
         readObject = (FTPTransferObject) in.readObject();
@@ -212,45 +230,56 @@ public class FTPClient {
     public void readFileFromStream(FTPTransferObject readObject) throws IOException {
         System.out.println("readFileFromStream");
         if (readObject.getFileSize() == 0) {
-            int i=inStream.read(new byte[1]); //TODO 1
-            System.out.println("READED 0 FROM FILE, RETURNING: "+i);
+            //int i=inStream.read(new byte[1]); //TODO 1
+            System.out.println("READED 0 FROM FILE, RETURNING: ");
             return;
         }
         if (readObject.getPathServer() != null) {
-            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(new File("C:\\Users\\Stefan.STEFAN-PC\\Desktop\\"+readObject.getName())));
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(new File("C:\\Users\\Stefan.STEFAN-PC\\Desktop\\" + readObject.getName())));
 
             byte[] readBuffer = new byte[528];
-            long fileSizeEnc = ((readObject.getFileSize()/512)+1)*528;
-            long fileSize=readObject.getFileSize();
-            long read=0;
-            while (fileSizeEnc>0) {
+            long fileSizeEnc = ((readObject.getFileSize() / 512) + 1) * 528;
+            long fileSize = readObject.getFileSize();
+            long read = 0;
+            long currentTimeSeconds;
+            while (fileSizeEnc > 0) {
+                while(inStream.available()<528){
+                    try {
+                        Thread.sleep(300);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("WAITING");
+                }
+                currentTimeSeconds = System.currentTimeMillis() / 1000;
                 int num = inStream.read(readBuffer, 0, 528);
                 if (num <= 0) break;
-                byte[] decrypted=AES.decrypt(readBuffer,key);
+                byte[] decrypted = AES.decrypt(readBuffer, key);
                 assert decrypted != null;
-                bos.write(decrypted, 0, fileSize<512?(int)fileSize:decrypted.length);
-                read+=512;
-                fileSizeEnc-=528;
-                fileSize-=512;
-                FTPClientUI.updateBar(((double)read-1)/(double)fileSize);
+                bos.write(decrypted, 0, fileSize < 512 ? (int) fileSize : decrypted.length);
+                read += 512;
+                fileSizeEnc -= 528;
+                fileSize -= 512;
+                FTPClientUI.updateBar(((double) read - 1) / (double) fileSize, (((double) System.currentTimeMillis() / 1000) - currentTimeSeconds) * 512);
             }
+            FTPClientUI.updateBar(0, 0);
             bos.flush();
             bos.close();
         }
     }
 
-    public void generateKey(){
-        KeyGenerator keyGenerator=new KeyGenerator(new Random().nextInt()+1);
+    public void generateKey() {
+        KeyGenerator keyGenerator = new KeyGenerator(new Random().nextInt() + 10);
         try {
-            DataInputStream fromServer=new DataInputStream(socket.getInputStream());
-            DataOutputStream toServer=new DataOutputStream(socket.getOutputStream());
-            keyGenerator.setReceivedCode(fromServer.readLong());
-            toServer.writeLong(keyGenerator.getCodeToSend());
-            toServer.flush();
+            byte[] received = new byte[32];
+            inStream.read(received, 0, 32);
+            keyGenerator.setReceivedCode(Long.parseLong(new String(received, StandardCharsets.US_ASCII).trim()));
+            outStream.write(Arrays.copyOf(String.valueOf(keyGenerator.getCodeToSend()).getBytes(StandardCharsets.US_ASCII), 16));
+            outStream.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        this.key=keyGenerator.getFinalCode()+"";
+        this.key = String.valueOf(keyGenerator.getFinalCode());
     }
 
     /**
