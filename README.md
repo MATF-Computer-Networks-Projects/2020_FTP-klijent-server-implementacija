@@ -1,4 +1,7 @@
 # 2020_FTP-klijent-server-implementacija
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/46b04e6bfec944f1a298772338e1dcba)](https://app.codacy.com/gh/MATF-Computer-Networks-Projects/2020_FTP-klijent-server-implementacija?utm_source=github.com&utm_medium=referral&utm_content=MATF-Computer-Networks-Projects/2020_FTP-klijent-server-implementacija&utm_campaign=Badge_Grade)
+
 Prenos fajlova izmedju klijenata i servera, kreiranje i brisanje foldera i fajlova kao i ostale FTP komande. Implementacija FTP protokola je u Javi sa prosirenim funkcionalnostima kao na primer AES 128-bit enkripcija umesto standardnog SSL/TLS-a. Komunikacija se vrsi pomocu objekata koji se serijalizuju i enkriptuju, i ako je potrebno salje se ili preuzima fajl koji je takodje enkriptovan radi sprecavanja kradje podataka. Kljuc za enrkripciju se generise nakon konekcije na server, i nakon toga klijent salje svoje ime i sifru. Korisnicki interfejs je implementiran samo na klijentskoj strani, takodje sadrzi UNIX-style terminal za direktno izvrsavanje FTP komandi.
 
 ## Verzija jave potrebna za pokretanje servera/klijenta
