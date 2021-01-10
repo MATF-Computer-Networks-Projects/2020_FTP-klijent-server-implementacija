@@ -7,6 +7,9 @@ Prenos fajlova izmedju klijenata i servera, kreiranje i brisanje foldera i fajlo
 ## Verzija jave potrebna za pokretanje servera/klijenta
 - Za projekat je neophodno imati jre 9.0.4 ili noviju verziju. Nisu potrebne dodatne biblioteke.<br/><br/>
 
+## Kompatibilnost
+- Program je kompatibilan i sa Windows i sa GNU/Linux operativnim sistemom. Kod je pisan na Windows operativnom sistemu. 
+
 ## Pokretanje servera i klijenta
 
 Server se pokrece tako sto se kao argument prosledi port na kome ce server raditi:
