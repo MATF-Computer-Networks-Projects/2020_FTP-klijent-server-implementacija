@@ -7,9 +7,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Random;
+import java.util.*;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
@@ -30,6 +28,7 @@ public class FTPServer {
     private final int port;
     private Logger logger = Logger.getLogger("ErrorLoggerServer");
     private FileHandler fh;
+    private final Map<String, String> credentials = new HashMap<>();
 
     public FTPServer(int port) {
         this.port = port;
@@ -44,6 +43,7 @@ public class FTPServer {
      */
     public void createSocket() throws IOException {
         ftv = new FolderTreeView(new FTPFile(System.getProperty("user.dir")));
+        loadCredentials();
         ServerSocket serverSocket = new ServerSocket(port);
         configureLog();
         System.err.println("Server ready");
@@ -347,7 +347,7 @@ public class FTPServer {
         } else {
             System.out.println("Authentication failed.");
         }
-        if (username.equals("admin") && password.equals("admin") || username.equals("root") && password.equals("root")) {
+        if (checkCredentials(username,password)) {
             currentClient = new ClientConnection(username, password, socket);
             currentClient.setKey(genKey);
             System.out.println("Credentials correct. Successfully logged in as " + username + ", IP:" + currentClient.getClientIP());
@@ -360,6 +360,29 @@ public class FTPServer {
             writeToSocket(client, null, FTPCommand.FAILURE, -1, "Incorrect credentials!");
         }
         return currentClient;
+    }
+
+
+    private void loadCredentials() {
+        BufferedReader reader;
+        try {
+            reader = new BufferedReader(new FileReader("client_credentials.txt"));
+            String line = reader.readLine();
+            while (line != null) {
+                credentials.put(line.split("=")[0].trim(),line.split("=")[1].trim());
+                line = reader.readLine();
+            }
+            System.out.println(credentials);
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean checkCredentials(String username, String password){
+        if(credentials.containsKey(username)){
+            return credentials.get(username).equals(password);
+        }else return false;
     }
 
 
