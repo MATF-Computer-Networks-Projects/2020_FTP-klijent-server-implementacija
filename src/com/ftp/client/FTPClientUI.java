@@ -28,7 +28,7 @@ import java.util.Date;
 import java.util.Properties;
 
 /**
- * This class is user interface for {@link FTPClient}. It contains input fields, areas, buttons for easier usage for performing FTP commands,
+ * This class is user interface for {@link FTPClient}. It contains input fields, areas, buttons for easier usage of FTP commands,
  * but also there is terminal which can be used for executing commands directly to {@link com.ftp.server.FTPServer}. This user interface executes same commands
  * in background (like {@link FTPCommand#GET},{@link FTPCommand#PUT}... to make easier usage of this client.
  *
@@ -38,7 +38,7 @@ public class FTPClientUI extends Application {
     public FTPFile selected = null;
     double xOffset;
     double yOffset;
-    public static boolean connected=false;
+    public static boolean connected = false;
     public static TreeItem<FTPFile> selectedFolder;
     public static FTPClient client;
     public static String logMessage = "";
@@ -104,7 +104,7 @@ public class FTPClientUI extends Application {
             obj.setIconified(true);
         });
         upload.setOnAction(e -> {
-            if (selected==null||selectedFolder==null) {
+            if (selected == null || selectedFolder == null) {
                 Alert a = new Alert(Alert.AlertType.WARNING);
                 a.setContentText("File not choosen! Chose file first.");
                 a.show();
@@ -145,7 +145,7 @@ public class FTPClientUI extends Application {
                     ioException.printStackTrace();
                 }
             }
-            if(!connected) {
+            if (!connected) {
                 addToLog("Connecting...\n");
                 client = new FTPClient(username.getText(), password.getText(), host.getText(), Integer.parseInt(port.getText()));
                 boolean success = client.createSocket();
@@ -154,11 +154,11 @@ public class FTPClientUI extends Application {
                 } else {
                     addToLog("Failed to connect.\n");
                 }
-            }else{
-                connected=false;
-                client.writeToSocket(null,null,FTPCommand.CLOSE);
+            } else {
+                connected = false;
+                client.writeToSocket(null, null, FTPCommand.CLOSE);
                 addToLog("Disconnected.\n");
-                console.appendText("\n"+System.getProperty("user.name") + "@localhost:~$ ");
+                console.appendText("\n" + System.getProperty("user.name") + "@localhost:~$ ");
                 connect.setText("Connect");
             }
         });
@@ -208,16 +208,16 @@ public class FTPClientUI extends Application {
         progress.setAlignment(Pos.CENTER);
         speed.setMinWidth(30);
         speed.setMaxWidth(80);
-        pause.setOnAction(e->{
-            if(client.getPause()){
+        pause.setOnAction(e -> {
+            if (client.getPause()) {
                 pause.setText("Pause");
                 client.setPause(false);
-            }else{
+            } else {
                 pause.setText("Resume");
                 client.setPause(true);
             }
         });
-        progress.getChildren().addAll(bar,pause,speed);
+        progress.getChildren().addAll(bar, pause, speed);
         VBox vBox = new VBox(titleBar, hBox, rememberMe, progress, treeAndLog, fileUpload, tabPane);
         vBox.setAlignment(Pos.CENTER);
         treeView.setMaxHeight(400);
@@ -295,8 +295,8 @@ public class FTPClientUI extends Application {
             a.setContentText("Path: " + selected.getAbsolutePath() + "\nSize: " + selected.length() + " B\nLast modified on: " + new Date(selected.lastModified()) + "\n");
             a.show();
         });
-        refreshItem.setOnAction(e->{
-            client.writeToSocket(null,null,FTPCommand.TREE);
+        refreshItem.setOnAction(e -> {
+            client.writeToSocket(null, null, FTPCommand.TREE);
             addToLog("Refreshing tree view...\n");
         });
         ContextMenu rootContextMenu = new ContextMenu();
@@ -317,27 +317,27 @@ public class FTPClientUI extends Application {
     }
 
     private void checkConnected(FTPClient client, TextArea console, Button connect) {
-        Platform.runLater(()->{
-            connected=client.checkConnected();
-            if(connected) {
+        Platform.runLater(() -> {
+            connected = client.checkConnected();
+            if (connected) {
                 console.setText(client.getUsername() + "@" + client.getHost() + ":~$ ");
                 connect.setText("Disconnect");
-            }else{
+            } else {
                 connect.setText("Connect");
             }
         });
     }
 
     public static void disconnect() {
-        connected=false;
+        connected = false;
         connect.setText("Connect");
     }
 
     public static void connect() {
-        connected=client.checkConnected();
-        if(connected) {
+        connected = client.checkConnected();
+        if (connected) {
             connect.setText("Disconnect");
-        }else{
+        } else {
             connect.setText("Connect");
         }
     }

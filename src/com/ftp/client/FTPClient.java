@@ -26,7 +26,7 @@ public class FTPClient {
     private OutputStream outStream = null;
     private TreeItem<FTPFile> tree = null;
     private int connected = 0;
-    private boolean pause=false;
+    private boolean pause = false;
     private final String username;
     private final String password;
     private final String host;
@@ -66,7 +66,7 @@ public class FTPClient {
 
     /**
      * This method creates thread for reading from socket stream. It is called after successful connection to server.
-     * Method reads {@link FTPTransferObject} from input stream, and after that reads file bytes (if there is any) or synchronization byte.
+     * Method reads {@link FTPTransferObject} from input stream, and after that reads file bytes (if there is any.
      * Tree view (server's file explorer) is updated on every change on server side.
      */
     public void readFromSocket() {
@@ -74,20 +74,20 @@ public class FTPClient {
             while (socket.isConnected()) {
                 try {
                     FTPTransferObject readObject = readObjectFromStream();
-                    if(readObject.getAdditionalData()!=null) {
+                    if (readObject.getAdditionalData() != null) {
                         tree = TreeItemSerialisation.deserialize(readObject.getAdditionalData());
                     }
                     FTPClientUI.addToLog("Server response: " + readObject.getResponseMessage() + "\n");
                     readFileFromStream(readObject);
-                    if(readObject.getResponseCode()==-1){
-                        connected=-1;
+                    if (readObject.getResponseCode() == -1) {
+                        connected = -1;
                         return;
-                    }else {
+                    } else {
                         connected = 1;
                     }
                 } catch (IOException | ClassNotFoundException e) {
                     FTPClientUI.addToLog(e.getMessage());
-                    connected=0;
+                    connected = 0;
                     return;
                 }
             }
@@ -98,8 +98,8 @@ public class FTPClient {
     }
 
     /**
-     * This method creates thread that is used for sending {@link FTPTransferObject} to server. After object, if required, file bytes are sent.
-     * If there is no need for sending file, synchronization byte is sent, It runs on command (unlike read thread which runs infinitely until connection is closed).
+     * This method creates thread that is used for sending {@link FTPTransferObject} to server. After object, if required, encrypted file bytes are sent.
+     * It runs on command (unlike read thread which runs infinitely until connection is closed).
      *
      * @param pathClient Path from client (if file needs to be sent)
      * @param pathServer Path on server side (if file needs to be received or folder needs to be created)
@@ -110,7 +110,7 @@ public class FTPClient {
             try {
                 writeObjectToStream(pathClient, pathServer, command);
                 writeFileToStream(pathClient, !command.equals(FTPCommand.PUT));
-                if(command.equals(FTPCommand.CLOSE)) {
+                if (command.equals(FTPCommand.CLOSE)) {
                     socket.close();
                 }
             } catch (IOException e) {
@@ -161,7 +161,7 @@ public class FTPClient {
     }
 
     /**
-     * This method send file to server. If there is no need for file to be sent, synchronization byte is sent. File size is sent in object.
+     * This method send file as encrypted bytes to server (if required). File size was already sent in object.
      * Method uses {@link BufferedInputStream} for reading file by chunks, each chunk is 512 bytes length, and writes them directly to stream.
      *
      * @param pathClient Path from client's file that needs to be sent
@@ -175,7 +175,7 @@ public class FTPClient {
         byte[] myBuffer = new byte[512];
         BufferedInputStream bis = new BufferedInputStream(new FileInputStream(pathClient));
         long currentTimeSeconds;
-        int read=0;
+        int read = 0;
         while (true) {
             currentTimeSeconds = System.currentTimeMillis() / 1000;
             int bytesRead = bis.read(myBuffer, 0, 512);
@@ -183,9 +183,9 @@ public class FTPClient {
             byte[] encrypted = AES.encrypt(myBuffer, key);
             assert encrypted != null;
             outStream.write(encrypted, 0, 528);
-            read+=528;
-            FTPClientUI.updateBar(((double) read - 1) / (double) pathClient.length(), 528/(((double) System.currentTimeMillis() / 1000) - currentTimeSeconds));
-            while(pause){
+            read += 528;
+            FTPClientUI.updateBar(((double) read - 1) / (double) pathClient.length(), 528 / (((double) System.currentTimeMillis() / 1000) - currentTimeSeconds));
+            while (pause) {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
@@ -221,7 +221,7 @@ public class FTPClient {
         }
         int readBytes = 0;
         while (size - readBytes > 0) {
-            while(inStream.available()<Math.min(size - readBytes, 512)){
+            while (inStream.available() < Math.min(size - readBytes, 512)) {
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
@@ -241,7 +241,7 @@ public class FTPClient {
     }
 
     /**
-     * This method reads file from stream and stores it in client's directory. If there is no file, only synchronization byte is read.
+     * This method reads file from stream and stores it in client's directory.
      * From given {@link FTPTransferObject} file size is read, and then, with 512 bytes buffer, file is read and stored.
      *
      * @param readObject Read object from stream before reading file
@@ -260,7 +260,7 @@ public class FTPClient {
             long read = 0;
             long currentTimeSeconds;
             while (fileSizeEnc > 0) {
-                while(inStream.available()<528){
+                while (inStream.available() < 528) {
                     try {
                         Thread.sleep(500);
                     } catch (InterruptedException e) {
@@ -276,8 +276,8 @@ public class FTPClient {
                 read += 512;
                 fileSizeEnc -= 528;
                 fileSize -= 512;
-                FTPClientUI.updateBar(((double) read - 1) / ((double) fileSize), 512/(((double) System.currentTimeMillis() / 1000) - currentTimeSeconds));
-                while(pause){
+                FTPClientUI.updateBar(((double) read - 1) / ((double) fileSize), 512 / (((double) System.currentTimeMillis() / 1000) - currentTimeSeconds));
+                while (pause) {
                     try {
                         Thread.sleep(100);
                     } catch (InterruptedException e) {
@@ -291,6 +291,9 @@ public class FTPClient {
         }
     }
 
+    /**
+     * This method uses Diffie Hellman algorithm for generating encryption key with server.
+     */
     public void generateKey() {
         KeyGenerator keyGenerator = new KeyGenerator(new Random().nextInt() + 10);
         try {
@@ -305,44 +308,29 @@ public class FTPClient {
         this.key = String.valueOf(keyGenerator.getFinalCode());
     }
 
-    /**
-     * Method returns client username.
-     *
-     * @return Username
-     */
     public String getUsername() {
         return username;
     }
 
-    /**
-     * Method returns hostname.
-     *
-     * @return Hostname
-     */
     public String getHost() {
         return host;
     }
 
-    /**
-     * Method returns tree representation of remote files/folders
-     *
-     * @return Tree with files/folders
-     */
     public TreeItem<FTPFile> getTree() {
         return tree;
     }
 
     public boolean checkConnected() {
-        int iter=0;
-        while(connected==0){
+        int iter = 0;
+        while (connected == 0) {
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            if(connected==-1) return false;
-            if(connected==1) return true;
-            if(iter>20) break;
+            if (connected == -1) return false;
+            if (connected == 1) return true;
+            if (iter > 20) break;
             iter++;
         }
         return false;
@@ -352,7 +340,7 @@ public class FTPClient {
         return pause;
     }
 
-    public void setPause(boolean p){
-        pause=p;
+    public void setPause(boolean p) {
+        pause = p;
     }
 }

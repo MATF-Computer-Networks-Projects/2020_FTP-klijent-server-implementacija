@@ -5,6 +5,11 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
+/**
+ * This class is replacement for {@link File} class in standard Java library. It is used for keeping file properties after serialization
+ * because Java's {@link File} doesn't keep field values after deserializing.
+ */
 public class FTPFile implements Serializable {
 
     public File file;
@@ -20,8 +25,8 @@ public class FTPFile implements Serializable {
     public long lastModified;
     public String owner;
 
-    public FTPFile(String path){
-        this.file=new File(path);
+    public FTPFile(String path) {
+        this.file = new File(path);
         try {
             initParams();
         } catch (IOException e) {
@@ -29,22 +34,27 @@ public class FTPFile implements Serializable {
         }
     }
 
+    /**
+     * Initializes parameters before object usage
+     *
+     * @throws IOException If {@link Path} cannot be obtained
+     */
     private void initParams() throws IOException {
-        absolutePath=file.getAbsolutePath();
-        path=file.getPath();
-        name=file.getName();
-        length=file.length();
-        directory=file.isDirectory();
-        lastModified=file.lastModified();
-        symLink=Files.isSymbolicLink(file.toPath());
-        canWrite=file.canWrite();
-        canRead=file.canRead();
-        canExecute=file.canExecute();
-        owner=Files.getOwner(file.toPath()).toString();
+        absolutePath = file.getAbsolutePath();
+        path = file.getPath();
+        name = file.getName();
+        length = file.length();
+        directory = file.isDirectory();
+        lastModified = file.lastModified();
+        symLink = Files.isSymbolicLink(file.toPath());
+        canWrite = file.canWrite();
+        canRead = file.canRead();
+        canExecute = file.canExecute();
+        owner = Files.getOwner(file.toPath()).toString();
     }
 
-    public FTPFile(File file){
-        this.file=file;
+    public FTPFile(File file) {
+        this.file = file;
         try {
             initParams();
         } catch (IOException e) {
@@ -80,7 +90,7 @@ public class FTPFile implements Serializable {
         return file.toPath();
     }
 
-    public String getOwner() throws IOException {
+    public String getOwner() {
         return owner;
     }
 

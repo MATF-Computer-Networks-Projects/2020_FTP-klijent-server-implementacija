@@ -8,10 +8,18 @@ import java.util.Arrays;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 
+/**
+ * Class is used for encrypting and decrypting bytes that needs to be sent. It uses AES 128bit encryption algorithm.
+ */
 public class AES {
 
     private static SecretKeySpec secretKey;
 
+    /**
+     * Setting key for encryption.
+     *
+     * @param myKey Key as string that is needed for creating {@link SecretKeySpec}
+     */
     public static void setKey(String myKey) {
         MessageDigest sha;
         try {
@@ -25,6 +33,13 @@ public class AES {
         }
     }
 
+    /**
+     * Encrypt byte array using given encryption algorithm
+     *
+     * @param arr    Array to be encrypted
+     * @param secret Key
+     * @return Encrypted byte array
+     */
     public static byte[] encrypt(byte[] arr, String secret) {
         try {
             setKey(secret);
@@ -37,6 +52,13 @@ public class AES {
         return null;
     }
 
+    /**
+     * Decrypt byte array using given encryption algorithm
+     *
+     * @param arr    Array to be decrypted
+     * @param secret Key
+     * @return Decrypted byte array
+     */
     public static byte[] decrypt(byte[] arr, String secret) {
         try {
             setKey(secret);

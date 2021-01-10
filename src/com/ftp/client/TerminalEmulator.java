@@ -36,11 +36,10 @@ public class TerminalEmulator {
 
     /**
      * Executes command given in terminal
-     *
      */
     public void executeCommand() {
-        if(client==null){
-            client=FTPClientUI.getClient();
+        if (client == null) {
+            client = FTPClientUI.getClient();
         }
         if (treeItem == null && client != null) {
             treeItem = client.getTree();
@@ -56,76 +55,76 @@ public class TerminalEmulator {
         } else if (command.equals("pwd")) {
             console.appendText(client.getTree().getValue().getName());
         } else if (command.startsWith("cd")) {
-            if(command.substring(2).trim().equals("--help")){
+            if (command.substring(2).trim().equals("--help")) {
                 console.appendText("Usage: cd [path]");
-            }else{
-                if(command.substring(2).trim().equals("..")){
-                    pwd=pwd.substring(0,pwd.lastIndexOf("/"));
-                    treeItem=treeItem.getParent();
-                }else {
-                    boolean found=false;
+            } else {
+                if (command.substring(2).trim().equals("..")) {
+                    pwd = pwd.substring(0, pwd.lastIndexOf("/"));
+                    treeItem = treeItem.getParent();
+                } else {
+                    boolean found = false;
                     String folderName = command.substring(2).trim().replace("/", "");
                     for (TreeItem<FTPFile> item : treeItem.getChildren()) {
                         if (item.getValue().getName().equals(folderName)) {
                             treeItem = item;
-                            found=true;
+                            found = true;
                         }
                     }
-                    if(found){
+                    if (found) {
                         pwd += "/" + folderName;
-                    }else{
-                        console.appendText(command+": No such file or directory");
+                    } else {
+                        console.appendText(command + ": No such file or directory");
                     }
                 }
             }
         } else if (command.startsWith("get")) {
             String file = treeItem.getValue().getAbsolutePath() + File.separator + command.substring(3).trim();
-            if(command.substring(3).trim().equals("--help")){
+            if (command.substring(3).trim().equals("--help")) {
                 console.appendText("Usage: get [remote_file]");
-            }else {
-                client.writeToSocket(null,new File(file), FTPCommand.GET);
+            } else {
+                client.writeToSocket(null, new File(file), FTPCommand.GET);
                 FTPClientUI.addToLog("Downloading...\n");
             }
         } else if (command.startsWith("put")) {
             String file = command.substring(3).trim();
-            if(file.trim().equals("--help")){
+            if (file.trim().equals("--help")) {
                 console.appendText("Usage: put [local_file]");
-            }else {
+            } else {
                 FTPClientUI.addToLog("Uploading...\n");
-                client.writeToSocket(new File(file),new File(treeItem.getValue().getAbsolutePath()), FTPCommand.PUT);
+                client.writeToSocket(new File(file), new File(treeItem.getValue().getAbsolutePath()), FTPCommand.PUT);
             }
-        }else if (command.startsWith("tree")) {
+        } else if (command.startsWith("tree")) {
             FTPClientUI.addToLog("Refreshing tree view...\n");
-            client.writeToSocket(null,null,FTPCommand.TREE);
-        }else if (command.startsWith("rmdir")) {
+            client.writeToSocket(null, null, FTPCommand.TREE);
+        } else if (command.startsWith("rmdir")) {
             String file = command.substring(5).trim();
-            if(file.trim().equals("--help")){
+            if (file.trim().equals("--help")) {
                 console.appendText("Usage: rmdir [local_file] | [local_folder]");
-            }else {
+            } else {
                 FTPClientUI.addToLog("Removing selected file/folder...\n");
-                client.writeToSocket(null,new File(treeItem.getValue().getAbsolutePath()+ File.separator+file), FTPCommand.RMDIR);
+                client.writeToSocket(null, new File(treeItem.getValue().getAbsolutePath() + File.separator + file), FTPCommand.RMDIR);
             }
-        }else if (command.startsWith("close")) {
-            client.writeToSocket(null,null,FTPCommand.CLOSE);
+        } else if (command.startsWith("close")) {
+            client.writeToSocket(null, null, FTPCommand.CLOSE);
             FTPClientUI.addToLog("Disconnected.\n");
             caretPosition = console.getCaretPosition();
-            console.appendText("\n"+System.getProperty("user.name") + "@localhost:~$ ");
+            console.appendText("\n" + System.getProperty("user.name") + "@localhost:~$ ");
             FTPClientUI.disconnect();
             return;
-        }else if (command.startsWith("mkdir")) {
+        } else if (command.startsWith("mkdir")) {
             String file = command.substring(5).trim();
-            if(file.trim().equals("--help")){
+            if (file.trim().equals("--help")) {
                 console.appendText("Usage: rmdir [local_file] | [local_folder]");
-            }else {
+            } else {
                 FTPClientUI.addToLog("Creating folder...\n");
-                client.writeToSocket(null,new File(treeItem.getValue().getAbsolutePath()+ File.separator+file), FTPCommand.MKDIR);
+                client.writeToSocket(null, new File(treeItem.getValue().getAbsolutePath() + File.separator + file), FTPCommand.MKDIR);
             }
         } else if (command.startsWith("connect")) {
             try {
                 String credentials = command.substring(7);
-                if(credentials.trim().equals("--help")){
+                if (credentials.trim().equals("--help")) {
                     console.appendText("Usage: connect [OPTION]... [VALUE]...\n\t-h,\t\thostname\n\t-p,\t\ttarget port\n\t-usr,\t\tlogin username\n\t-pw,\t\tlogin password");
-                }else {
+                } else {
                     List<String> cr = Arrays.asList(credentials.split(" "));
                     String host = cr.get(cr.indexOf(cr.stream().filter(e -> {
                         return e.trim().contains("-h");
@@ -150,14 +149,14 @@ public class TerminalEmulator {
             } catch (Exception e) {
                 console.appendText("Invalid option. Type connect --help for usage.");
             }
-        }else{
+        } else {
             try {
                 console.appendText(execSysCommand(command));
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        console.appendText("\n" + (client==null?System.getProperty("user.name"):client.getUsername()) + "@" + (client==null?"localhost":client.getHost()) + ":~" + pwd + "$ ");
+        console.appendText("\n" + (client == null ? System.getProperty("user.name") : client.getUsername()) + "@" + (client == null ? "localhost" : client.getHost()) + ":~" + pwd + "$ ");
         caretPosition = console.getCaretPosition();
     }
 
@@ -165,12 +164,12 @@ public class TerminalEmulator {
      * Creates table with files listed with {@code ls} command.
      */
     public void listFiles() throws IOException {
-        StringBuilder output= new StringBuilder();
+        StringBuilder output = new StringBuilder();
         for (TreeItem<FTPFile> item : treeItem.getChildren()) {
             output.append(String.format("%-12s%-20s%-10s%-15s%-20s\n", posixFilePermissions(item.getValue()),
-                    item.getValue().getOwner().replace("(User)","")
-                            .substring(item.getValue().getOwner().lastIndexOf("\\")+1),
-                    (item.getValue().isDirectory()&&item.getValue().length()==0?"4096":item.getValue().length()),
+                    item.getValue().getOwner().replace("(User)", "")
+                            .substring(item.getValue().getOwner().lastIndexOf("\\") + 1),
+                    (item.getValue().isDirectory() && item.getValue().length() == 0 ? "4096" : item.getValue().length()),
                     (new SimpleDateFormat("MMM dd yyyy")).format(item.getValue().lastModified()),
                     item.getValue().getName()));
         }
@@ -183,15 +182,15 @@ public class TerminalEmulator {
      * @param file File to be checked
      * @return String representation of file permissions
      */
-    public String posixFilePermissions(FTPFile file){
-        String perms=(file.canRead()?"r":"-")+(file.canWrite()?"w":"-")+(file.canExecute()?"x":"-");
-        return getFileType(file)+perms+perms+perms;
+    public String posixFilePermissions(FTPFile file) {
+        String perms = (file.canRead() ? "r" : "-") + (file.canWrite() ? "w" : "-") + (file.canExecute() ? "x" : "-");
+        return getFileType(file) + perms + perms + perms;
     }
 
     public String execSysCommand(String command) throws IOException {
-        StringBuilder value=new StringBuilder();
+        StringBuilder value = new StringBuilder();
         Runtime rt = Runtime.getRuntime();
-        Process proc = rt.exec("cmd.exe /c "+command); //TODO check if windows or linux
+        Process proc = rt.exec("cmd.exe /c " + command); //TODO check if windows or linux
 
         BufferedReader stdInput = new BufferedReader(new
                 InputStreamReader(proc.getInputStream()));
@@ -216,21 +215,24 @@ public class TerminalEmulator {
      * @param file File to be checked
      * @return String representation of file type
      */
-    public String getFileType(FTPFile file){
-        if(file.isSymbolicLink()) return "s";
-        if(file.isDirectory()) return "d";
+    public String getFileType(FTPFile file) {
+        if (file.isSymbolicLink()) return "s";
+        if (file.isDirectory()) return "d";
         return "-";
     }
 
     /**
      * Method for getting cursor position in terminal
+     *
      * @return Cursor position
      */
     public int getCaretPosition() {
         return caretPosition;
     }
+
     /**
      * Method for writing last used command on pressing up key
+     *
      * @return Last used command
      */
     public String getLastCommand() {
@@ -241,9 +243,9 @@ public class TerminalEmulator {
      * Autocomplete when pressing tab
      */
     public void autoFill() {
-        String toComplete=console.getText().substring(console.getText().lastIndexOf("$")+2).split(" ")[1].trim();
-        for(TreeItem<FTPFile> item:treeItem.getChildren()){
-            if(item.getValue().getName().startsWith(toComplete)){
+        String toComplete = console.getText().substring(console.getText().lastIndexOf("$") + 2).split(" ")[1].trim();
+        for (TreeItem<FTPFile> item : treeItem.getChildren()) {
+            if (item.getValue().getName().startsWith(toComplete)) {
                 console.appendText(item.getValue().getName().substring(toComplete.length()));
                 break;
             }

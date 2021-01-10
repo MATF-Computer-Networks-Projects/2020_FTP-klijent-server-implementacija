@@ -55,6 +55,11 @@ public class ClientConnection {
         return socket;
     }
 
+    /**
+     * Returns client's IP.
+     *
+     * @return IP
+     */
     public String getClientIP() {
         return socket.getRemoteSocketAddress().toString().substring(1);
     }

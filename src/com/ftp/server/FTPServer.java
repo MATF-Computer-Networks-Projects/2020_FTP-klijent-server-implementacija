@@ -16,8 +16,9 @@ import java.util.logging.SimpleFormatter;
 
 /**
  * This is basic class that represents FTP server. It uses {@link Socket} for opening connection with given port and communicate with {@link FTPTransferObject}. It has 2 main threads,
- * one for reading and one for writing to socket input/output stream assigned to each client. Upon client connecting it reads username and password as plain {@link String}
- * and after that, if credentials are correct, client can get it's own socket, then runs read thread which is responsible for listening and reading {@link FTPTransferObject} from each client.
+ * one for reading and one for writing to socket input/output stream assigned to each client. Upon client connecting, after creating key for encryption
+ * it reads username and password as plain {@link String} and after that, if credentials are correct, client can get it's own socket,
+ * then runs read thread which is responsible for listening and reading {@link FTPTransferObject} from each client.
  * On client connected, server sends object to client that contains {@link TreeItem} with folders/files from it.
  * Thread for writing to socket output stream runs on command received from client, while reading thread for each client works infinitely (until client disconnect).
  *
@@ -55,13 +56,13 @@ public class FTPServer {
                 if (currentClient != null) {
                     manager.addClient(currentClient);
                 }
-                System.out.println("Clients available: "+manager.clients.size());
+                System.out.println("Clients available: " + manager.clients.size());
             } catch (IOException io) {
                 addToLog(io);
                 assert socket != null;
                 socket.close();
                 System.err.println("Client has been disconnected! Error: " + io.getMessage());
-                System.out.println("Clients remaining: "+manager.clients.size());
+                System.out.println("Clients remaining: " + manager.clients.size());
             }
         }
 
@@ -70,7 +71,6 @@ public class FTPServer {
     /**
      * This method is responsible for listening to each client socket and reading commands from it. After client sends {@link FTPTransferObject} server
      * receives it and reads {@link FTPCommand}. Depends on command certain actions are performed, some of them locally some of them returns file to client.
-     * Each package sent through socket is authenticated every time to avoid unattended access to server.
      *
      * @param client The client for whom this thread is responsible
      */
@@ -82,27 +82,27 @@ public class FTPServer {
                     readFileFromStream(client, readObject);
 
                     if (readObject.getCommand().equals(FTPCommand.GET)) {
-                        System.out.println(client.getUsername()+" ("+client.getClientIP()+") requested download of "+readObject.getPathServer());
+                        System.out.println(client.getUsername() + " (" + client.getClientIP() + ") requested download of " + readObject.getPathServer());
                         writeToSocket(client, readObject.getPathServer(), FTPCommand.GET, 1, "File sent successfully");
                     }
                     if (readObject.getCommand().equals(FTPCommand.CLOSE)) {
                         manager.removeClient(client);
-                        System.err.println(client.getUsername()+" ("+client.getClientIP()+") requested disconnect. Disconnecting " + client.getClientIP());
-                        System.out.println("Clients remaining: "+manager.clients.size());
+                        System.err.println(client.getUsername() + " (" + client.getClientIP() + ") requested disconnect. Disconnecting " + client.getClientIP());
+                        System.out.println("Clients remaining: " + manager.clients.size());
                         client.getSocket().close();
                         return;
                     }
                     if (readObject.getCommand().equals(FTPCommand.TREE)) {
-                        System.out.println(client.getUsername()+" ("+client.getClientIP()+") requested tree refresh.");
+                        System.out.println(client.getUsername() + " (" + client.getClientIP() + ") requested tree refresh.");
                         writeToSocket(client, null, FTPCommand.SUCCESS, 1, "Tree view sent.");
                     }
                     if (readObject.getCommand().equals(FTPCommand.MKDIR)) {
-                        System.out.println(client.getUsername()+" ("+client.getClientIP()+") requested creating "+readObject.getPathServer());
+                        System.out.println(client.getUsername() + " (" + client.getClientIP() + ") requested creating " + readObject.getPathServer());
                         createFolder(readObject.getPathServer());
                         writeToSocket(client, null, FTPCommand.SUCCESS, 1, "Folder created successfully");
                     }
                     if (readObject.getCommand().equals(FTPCommand.RMDIR)) {
-                        System.out.println(client.getUsername()+" ("+client.getClientIP()+") requested deleting "+readObject.getPathServer());
+                        System.out.println(client.getUsername() + " (" + client.getClientIP() + ") requested deleting " + readObject.getPathServer());
                         try {
                             deleteFolder(readObject.getPathServer());
                             writeToSocket(client, readObject.getPathServer(), FTPCommand.SUCCESS, 1, "Folder/file deleted successfully");
@@ -113,9 +113,9 @@ public class FTPServer {
                     }
 
                 } catch (IOException | ClassNotFoundException e) {
-                    System.err.println(client.getUsername()+" (" + client.getClientIP() + ") disconnected.");
+                    System.err.println(client.getUsername() + " (" + client.getClientIP() + ") disconnected.");
                     manager.removeClient(client);
-                    System.out.println("Clients remaining: "+manager.clients.size());
+                    System.out.println("Clients remaining: " + manager.clients.size());
                     try {
                         client.getSocket().close();
                     } catch (IOException ioException) {
@@ -159,7 +159,7 @@ public class FTPServer {
     }
 
     /**
-     * This method is responsible for reading object from client input stream. First it reads size of object
+     * This method is responsible for reading serialized object from client input stream. First it reads size of object
      * represented as {@link String}, then reads object with that size.
      *
      * @param client Client which stream needs to be read
@@ -174,7 +174,7 @@ public class FTPServer {
         byte[] objInputArray = new byte[size];
         int readBytes = 0;
         while (size - readBytes > 0) {
-            while(client.getInStream().available()<Math.min(size - readBytes, 512)){
+            while (client.getInStream().available() < Math.min(size - readBytes, 512)) {
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
@@ -195,17 +195,24 @@ public class FTPServer {
         return readedObject;
     }
 
+    /**
+     * This method reads file that was sent from client. It is decrypted after receiving every chunk (512 bytes).
+     *
+     * @param client     Client that send file
+     * @param readObject Object that contains file size and other file related properties
+     * @throws IOException if there is problem with file creation or other.
+     */
     public void readFileFromStream(ClientConnection client, FTPTransferObject readObject) throws IOException {
         if (readObject.getFileSize() == 0) {
             return;
         }
         BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(new File(readObject.getPathServer().getPath() + "/" + readObject.getPathClient().getName())));
-        System.out.println("Reading file from "+client.getUsername()+" ("+client.getClientIP()+")");
+        System.out.println("Reading file from " + client.getUsername() + " (" + client.getClientIP() + ")");
         byte[] readBuffer = new byte[528];
         long fileSizeEnc = ((readObject.getFileSize() / 512) + 1) * 528;
         long fileSize = readObject.getFileSize();
         while (fileSizeEnc > 0) {
-            while(client.getInStream().available()<528){
+            while (client.getInStream().available() < 528) {
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
@@ -226,11 +233,20 @@ public class FTPServer {
         bos.close();
     }
 
+    /**
+     * This method writes file to stream. It encrypts file chunks (512 bytes) and sends them.
+     *
+     * @param client     Client to whom file needs to be sent
+     * @param pathServer Server side path of file that needs to be sent
+     * @param empty      If file don't need to be sent (considering that this method is called always on every object receiving)
+     *                   this parameter is set to {@code false}
+     * @throws IOException If there is problem with server file
+     */
     public void writeFileToStream(ClientConnection client, File pathServer, boolean empty) throws IOException {
         if (empty || pathServer == null || pathServer.getPath().equals("")) {
             return;
         }
-        System.out.println("Sending "+pathServer.getName()+" to "+client.getUsername()+" ("+client.getClientIP()+")");
+        System.out.println("Sending " + pathServer.getName() + " to " + client.getUsername() + " (" + client.getClientIP() + ")");
         byte[] myBuffer = new byte[512];
         BufferedInputStream bis = new BufferedInputStream(new FileInputStream(pathServer));
         while (true) {
@@ -245,6 +261,17 @@ public class FTPServer {
 
     }
 
+    /**
+     * This method sends serialized {@link FTPTransferObject} to certain client with necessary data. This can be response message, tree explorer...
+     *
+     * @param client          Client to whom object needs to be sent
+     * @param pathClient      Path from client side (for obtaining file properties)
+     * @param pathServer      Path from server side
+     * @param command         FTP command
+     * @param response        Response code for client
+     * @param responseMessage Response message for client
+     * @throws IOException if there is problem with certain file
+     */
     public void writeObjectToStream(ClientConnection client, File pathClient, File pathServer, FTPCommand command, Integer response, String responseMessage) throws IOException {
         FTPTransferObject objToSend = new FTPTransferObject(null, null, command, response, responseMessage, response == -1 ? null : TreeItemSerialisation.serialize(ftv.getTreeItem()));
         objToSend.setPathClient(pathClient);
@@ -274,6 +301,12 @@ public class FTPServer {
         out.close();
     }
 
+    /**
+     * This method generates encryption key using Diffie Hellman algorithm.
+     *
+     * @param client Client with whom key needs to be generated
+     * @return Generated key
+     */
     private String generateKey(Socket client) {
         KeyGenerator keyGenerator = new KeyGenerator(new Random().nextInt() + 10);
         try {
@@ -289,6 +322,13 @@ public class FTPServer {
         return null;
     }
 
+    /**
+     * This method is used for authenticating user before giving permission to connect to server.
+     *
+     * @param socket Possible client socket
+     * @return Connected client represented as {@link ClientConnection}
+     * @throws IOException if there is problem with reading/writing
+     */
     private ClientConnection authenticateUser(Socket socket) throws IOException {
         String username = "";
         String password = "";
@@ -323,6 +363,11 @@ public class FTPServer {
     }
 
 
+    /**
+     * Creating folder on server side
+     *
+     * @param file folder that needs to be created
+     */
     void createFolder(File file) {
         boolean ret = file.mkdir();
         System.out.println("Created folder: " + ret);
@@ -343,7 +388,7 @@ public class FTPServer {
             throw new FileNotFoundException("Failed to delete file: " + f);
     }
 
-    public void configureLog(){
+    public void configureLog() {
         try {
             logger.setUseParentHandlers(false);
             fh = new FileHandler("ErrorLoggerServer.log");
@@ -355,7 +400,7 @@ public class FTPServer {
         }
     }
 
-    public void addToLog(Exception e){
+    public void addToLog(Exception e) {
         System.err.println("Error! Check error log file.");
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
