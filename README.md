@@ -1,4 +1,4 @@
-# 2020_FTP-klijent-server-implementacija
+# FTP klijent server implementacija
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/46b04e6bfec944f1a298772338e1dcba)](https://app.codacy.com/gh/MATF-Computer-Networks-Projects/2020_FTP-klijent-server-implementacija?utm_source=github.com&utm_medium=referral&utm_content=MATF-Computer-Networks-Projects/2020_FTP-klijent-server-implementacija&utm_campaign=Badge_Grade)
 
