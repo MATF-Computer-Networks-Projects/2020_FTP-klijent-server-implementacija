@@ -8,7 +8,7 @@ Prenos fajlova izmedju klijenata i servera, kreiranje i brisanje foldera i fajlo
 - Projekat je pisan u Javi i za pokretanje je neophodno imati jre 9.0.4 ili noviju verziju. Nisu potrebne dodatne biblioteke.<br/><br/>
 
 ## Kompatibilnost
-- Program je kompatibilan i sa Windows i sa GNU/Linux operativnim sistemom. Kod je pisan na Windows operativnom sistemu. 
+- Program je kompatibilan i sa Windows i sa GNU/Linux operativnim sistemom. Kod je pisan na Windows operativnom sistemu.<br/><br/>
 
 ## Pokretanje servera i klijenta
 
