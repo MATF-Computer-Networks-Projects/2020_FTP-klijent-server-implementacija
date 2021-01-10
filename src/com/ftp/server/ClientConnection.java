@@ -56,8 +56,13 @@ public class ClientConnection {
     }
 
     public String getClientIP() {
-        return socket.getRemoteSocketAddress().toString();
+        return socket.getRemoteSocketAddress().toString().substring(1);
     }
+
+    public String getUsername() {
+        return username;
+    }
+
 
     @Override
     public boolean equals(Object o) {

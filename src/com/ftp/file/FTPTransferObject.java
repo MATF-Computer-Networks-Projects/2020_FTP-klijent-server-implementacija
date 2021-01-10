@@ -76,6 +76,10 @@ public class FTPTransferObject implements Serializable {
         return additionalData;
     }
 
+    public Integer getResponseCode() {
+        return responseCode;
+    }
+
     public void setAdditionalData(byte[] additionalData) {
         this.additionalData = additionalData;
     }

@@ -26,7 +26,7 @@ public enum FTPCommand {
 
     /**
      * Delete folder (with subfolders and files) or file on remote server.
-     * Command DEL for removing files is integrated in {@link FTPCommand#RMDIR}
+     * Command DEL for removing files is integrated this command.
      */
     RMDIR,
 
@@ -48,5 +48,5 @@ public enum FTPCommand {
     /**
      * Closing connection between client and server
      */
-    CLOSE;
+    CLOSE
 }

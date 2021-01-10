@@ -1,6 +1,7 @@
 package com.ftp.client;
 
 import com.ftp.file.FTPCommand;
+import com.ftp.file.FTPFile;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -9,6 +10,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
@@ -32,17 +35,19 @@ import java.util.Properties;
  * @author Stefan
  */
 public class FTPClientUI extends Application {
-    public File selected = null;
+    public FTPFile selected = null;
     double xOffset;
     double yOffset;
-    public static TreeItem<File> selectedFolder;
+    public static boolean connected=false;
+    public static TreeItem<FTPFile> selectedFolder;
     public static FTPClient client;
     public static String logMessage = "";
     public static ProgressBar bar = new ProgressBar(0);
-    public static Label speed=new Label();
+    public static Label speed = new Label();
+    public static Button connect = new Button("Connect");
     private static final TextArea log = new TextArea();
     private static TerminalEmulator te;
-    private static final TreeView<File> treeView = new TreeView<>(null);
+    private static final TreeView<FTPFile> treeView = new TreeView<>(null);
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -55,17 +60,17 @@ public class FTPClientUI extends Application {
         TextField username = new TextField();
         Label lbPassword = new Label("Password:");
         PasswordField password = new PasswordField();
-        Button connect = new Button("Connect");
         Button upload = new Button("Upload");
+        Button pause = new Button("Pause");
         Button mkdir = new Button("Create folder");
         CheckBox rememberMe = new CheckBox("Remember me");
         TextArea console = new TextArea();
-        HBox titleBar=new HBox(10);
+        HBox titleBar = new HBox(10);
         titleBar.setAlignment(Pos.TOP_RIGHT);
-        titleBar.setPadding(new Insets(0,0,20,0));
-        Button x=new Button("X");
-        Button mm=new Button("_");
-        titleBar.getChildren().addAll(mm,x);
+        titleBar.setPadding(new Insets(0, 0, 20, 0));
+        Button x = new Button("X");
+        Button mm = new Button("_");
+        titleBar.getChildren().addAll(mm, x);
         console.appendText(System.getProperty("user.name") + "@localhost:~$ ");
         TextField newFolder = new TextField();
         TextField pathToFile = new TextField();
@@ -91,22 +96,22 @@ public class FTPClientUI extends Application {
             port.setText(props.get("port").toString());
             rememberMe.setSelected(true);
         }
-        x.setOnAction(e->{
+        x.setOnAction(e -> {
             System.exit(0);
         });
-        mm.setOnAction(e->{
+        mm.setOnAction(e -> {
             Stage obj = (Stage) primaryStage.getScene().getWindow();
             obj.setIconified(true);
         });
         upload.setOnAction(e -> {
-            if (false) { //TODO 1
+            if (selected==null||selectedFolder==null) {
                 Alert a = new Alert(Alert.AlertType.WARNING);
                 a.setContentText("File not choosen! Chose file first.");
                 a.show();
             } else {
-                File f=new File(pathToFile.getText());
+                File f = new File(pathToFile.getText());
                 addToLog("Uploading " + f.getName() + "...\n");
-                client.writeToSocket(f, selectedFolder.getValue(), FTPCommand.PUT);
+                client.writeToSocket(f, new File(selectedFolder.getValue().getAbsolutePath()), FTPCommand.PUT);
             }
         });
         mkdir.setOnAction(e -> {
@@ -116,7 +121,7 @@ public class FTPClientUI extends Application {
                 a.show();
             } else {
                 addToLog("Creating folder...\n");
-                client.writeToSocket(null, new File(selectedFolder.getValue().getPath()+"/"+newFolder.getText()), FTPCommand.MKDIR);
+                client.writeToSocket(null, new File(selectedFolder.getValue().getPath() + "/" + newFolder.getText()), FTPCommand.MKDIR);
             }
         });
         connect.setOnAction(e -> {
@@ -140,17 +145,29 @@ public class FTPClientUI extends Application {
                     ioException.printStackTrace();
                 }
             }
-            addToLog("Connecting...\n");
-            client = new FTPClient(username.getText(), password.getText(), host.getText(), Integer.parseInt(port.getText()));
-            client.createSocket();
-            console.setText(username.getText() + "@" + host.getText() + ":~$ ");
+            if(!connected) {
+                addToLog("Connecting...\n");
+                client = new FTPClient(username.getText(), password.getText(), host.getText(), Integer.parseInt(port.getText()));
+                boolean success = client.createSocket();
+                if (success) {
+                    checkConnected(client, console, connect);
+                } else {
+                    addToLog("Failed to connect.\n");
+                }
+            }else{
+                connected=false;
+                client.writeToSocket(null,null,FTPCommand.CLOSE);
+                addToLog("Disconnected.\n");
+                console.appendText("\n"+System.getProperty("user.name") + "@localhost:~$ ");
+                connect.setText("Connect");
+            }
         });
         FileChooser fileChooser = new FileChooser();
         treeView.setCellFactory(new Callback<>() {
-            public TreeCell<File> call(TreeView<File> tv) {
+            public TreeCell<FTPFile> call(TreeView<FTPFile> tv) {
                 return new TreeCell<>() {
                     @Override
-                    protected void updateItem(File item, boolean empty) {
+                    protected void updateItem(FTPFile item, boolean empty) {
                         super.updateItem(item, empty);
                         setText((empty || item == null) ? "" : item.getName());
                     }
@@ -162,9 +179,9 @@ public class FTPClientUI extends Application {
         treeView.setOnMouseClicked(event -> {
             try {
                 @SuppressWarnings("unchecked")
-                TreeView<File> tree = ((TreeView<File>) event.getSource());
-                TreeItem<File> sel = tree.getSelectionModel().getSelectedItem();
-                selectedFolder = sel.getValue().isDirectory()?sel:sel.getParent();
+                TreeView<FTPFile> tree = ((TreeView<FTPFile>) event.getSource());
+                TreeItem<FTPFile> sel = tree.getSelectionModel().getSelectedItem();
+                selectedFolder = sel.getValue().isDirectory() ? sel : sel.getParent();
                 selected = sel.getValue();
             } catch (Exception ignored) {
             }
@@ -179,18 +196,28 @@ public class FTPClientUI extends Application {
             File selectedFile = fileChooser.showOpenDialog(primaryStage);
             pathToFile.setText(selectedFile.getAbsolutePath());
         });
-        HBox selectUpload=new HBox(10);
-        selectUpload.getChildren().addAll(selectFile,upload);
+        HBox selectUpload = new HBox(10);
+        selectUpload.getChildren().addAll(selectFile, upload);
         TabPane tabPane = new TabPane();
         Tab terminal1 = new Tab("Terminal 1", console);
         tabPane.getTabs().add(terminal1);
-        selectUpload.setPadding(new Insets(0,0,10,0));
-        VBox fileUpload=new VBox(10);
-        fileUpload.getChildren().addAll(pathToFile,selectUpload);
-        HBox progress=new HBox(10);
-        speed.setMinWidth(150);
-        speed.setMaxWidth(150);
-        progress.getChildren().addAll(bar,speed);
+        selectUpload.setPadding(new Insets(0, 0, 10, 0));
+        VBox fileUpload = new VBox(10);
+        fileUpload.getChildren().addAll(pathToFile, selectUpload);
+        HBox progress = new HBox(10);
+        progress.setAlignment(Pos.CENTER);
+        speed.setMinWidth(30);
+        speed.setMaxWidth(80);
+        pause.setOnAction(e->{
+            if(client.getPause()){
+                pause.setText("Pause");
+                client.setPause(false);
+            }else{
+                pause.setText("Resume");
+                client.setPause(true);
+            }
+        });
+        progress.getChildren().addAll(bar,pause,speed);
         VBox vBox = new VBox(titleBar, hBox, rememberMe, progress, treeAndLog, fileUpload, tabPane);
         vBox.setAlignment(Pos.CENTER);
         treeView.setMaxHeight(400);
@@ -238,39 +265,45 @@ public class FTPClientUI extends Application {
                 primaryStage.setY(event.getScreenY() + yOffset);
             }
         });
-        MenuItem downloadItem=new MenuItem("Download");
-        MenuItem deleteItem=new MenuItem("Delete");
-        MenuItem detailsItem=new MenuItem("Details");
-        downloadItem.setOnAction(e->{
+        MenuItem downloadItem = new MenuItem("Download");
+        MenuItem deleteItem = new MenuItem("Delete");
+        MenuItem detailsItem = new MenuItem("Details");
+        MenuItem refreshItem = new MenuItem("Refresh");
+        downloadItem.setOnAction(e -> {
             if (selected == null) {
                 Alert a = new Alert(Alert.AlertType.WARNING);
                 a.setContentText("Folder/file not selected! Select file/folder first.");
                 a.show();
             } else {
                 addToLog("Downloading " + selected.getName() + "...\n");
-                client.writeToSocket(null, selected, FTPCommand.GET);
+                client.writeToSocket(null, new File(selected.getAbsolutePath()), FTPCommand.GET);
             }
         });
-        deleteItem.setOnAction(e->{
+        deleteItem.setOnAction(e -> {
             if (selected == null) {
                 Alert a = new Alert(Alert.AlertType.WARNING);
                 a.setContentText("Folder/file not selected! Select file/folder first.");
                 a.show();
             } else {
                 addToLog("Removing selected file/folder...\n");
-                client.writeToSocket(null, selected, FTPCommand.RMDIR);
+                client.writeToSocket(null, new File(selected.getAbsolutePath()), FTPCommand.RMDIR);
             }
         });
-        detailsItem.setOnAction(e->{
+        detailsItem.setOnAction(e -> {
             Alert a = new Alert(Alert.AlertType.INFORMATION);
-            a.setTitle("Details for "+selected.getName());
-            a.setContentText("Path: "+selected.getAbsolutePath()+"\nSize: "+selected.length()+" B\nLast modified on: "+new Date(selected.lastModified()) +"\n");
+            a.setTitle("Details for " + selected.getName());
+            a.setContentText("Path: " + selected.getAbsolutePath() + "\nSize: " + selected.length() + " B\nLast modified on: " + new Date(selected.lastModified()) + "\n");
             a.show();
         });
-        ContextMenu rootContextMenu=new ContextMenu();
+        refreshItem.setOnAction(e->{
+            client.writeToSocket(null,null,FTPCommand.TREE);
+            addToLog("Refreshing tree view...\n");
+        });
+        ContextMenu rootContextMenu = new ContextMenu();
         rootContextMenu.getItems().add(downloadItem);
         rootContextMenu.getItems().add(deleteItem);
         rootContextMenu.getItems().add(detailsItem);
+        rootContextMenu.getItems().add(refreshItem);
 
         treeView.setContextMenu(rootContextMenu);
         bar.setMinWidth(scene.getWidth() - 170 - newFolder.getWidth());
@@ -283,7 +316,33 @@ public class FTPClientUI extends Application {
         primaryStage.show();
     }
 
-    private static void expandTreeView(TreeItem<File> selectedItem) {
+    private void checkConnected(FTPClient client, TextArea console, Button connect) {
+        Platform.runLater(()->{
+            connected=client.checkConnected();
+            if(connected) {
+                console.setText(client.getUsername() + "@" + client.getHost() + ":~$ ");
+                connect.setText("Disconnect");
+            }else{
+                connect.setText("Connect");
+            }
+        });
+    }
+
+    public static void disconnect() {
+        connected=false;
+        connect.setText("Connect");
+    }
+
+    public static void connect() {
+        connected=client.checkConnected();
+        if(connected) {
+            connect.setText("Disconnect");
+        }else{
+            connect.setText("Connect");
+        }
+    }
+
+    private static void expandTreeView(TreeItem<FTPFile> selectedItem) {
         if (selectedItem != null) {
             expandTreeView(selectedItem.getParent());
             if (!selectedItem.isLeaf()) {
@@ -310,7 +369,7 @@ public class FTPClientUI extends Application {
     public static void updateBar(double percentage, double speed) {
         Platform.runLater(() -> {
             bar.setProgress(percentage);
-            FTPClientUI.speed.setText((long)speed+" B/s");
+            FTPClientUI.speed.setText((long) speed + " B/s");
         });
     }
 

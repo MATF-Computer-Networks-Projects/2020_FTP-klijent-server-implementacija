@@ -1,6 +1,7 @@
 package com.ftp.file;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -8,16 +9,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import javafx.scene.control.TreeItem;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 
 /**
  * This class provides tree representation of remote repository folders and files
  * @author Stefan
  */
 public class FolderTreeView {
-    private final File rootFolder;
-    TreeItem<File> treeItem;
+    private final FTPFile rootFolder;
+    TreeItem<FTPFile> treeItem;
 
-    public FolderTreeView(File path) {
+    public FolderTreeView(FTPFile path) {
         this.rootFolder = path;
         treeItem = new TreeItem<>(rootFolder);
         createTree(treeItem);
@@ -27,10 +30,10 @@ public class FolderTreeView {
      * Method creates tree from given root folder recursively
      * @param rootItem Root folder
      */
-    public void createTree(TreeItem<File> rootItem) {
+    public void createTree(TreeItem<FTPFile> rootItem) {
         try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(Paths.get(rootItem.getValue().getAbsolutePath()))) {
             for (Path path : directoryStream) {
-                TreeItem<File> newItem = new TreeItem<>(path.toFile());
+                TreeItem<FTPFile> newItem = new TreeItem<>(new FTPFile(path.toFile()));
                 newItem.setExpanded(false);
                 rootItem.getChildren().add(newItem);
                 if (Files.isDirectory(path)) {
@@ -42,7 +45,7 @@ public class FolderTreeView {
         }
     }
 
-    public TreeItem<File> getTreeItem() {
+    public TreeItem<FTPFile> getTreeItem() {
         treeItem = new TreeItem<>(rootFolder);
         createTree(treeItem);
         return treeItem;

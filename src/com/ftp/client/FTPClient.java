@@ -24,7 +24,9 @@ public class FTPClient {
     private Socket socket = null;
     private InputStream inStream = null;
     private OutputStream outStream = null;
-    private TreeItem<File> tree = null;
+    private TreeItem<FTPFile> tree = null;
+    private int connected = 0;
+    private boolean pause=false;
     private final String username;
     private final String password;
     private final String host;
@@ -42,23 +44,24 @@ public class FTPClient {
      * This method is used for creating socket and connecting to server. On connecting it sends login credentials
      * and starts reading thread that is responsible for listening to socket and accepting {@link FTPTransferObject}.
      */
-    public void createSocket() {
+    public boolean createSocket() {
         try {
             socket = new Socket(host, port);
             inStream = socket.getInputStream();
             outStream = socket.getOutputStream();
             generateKey();
-            System.out.println("KEY " + key);
             byte[] toSend = Objects.requireNonNull(AES.encrypt((username + ":" + password).getBytes(StandardCharsets.UTF_8), key));
             byte[] sizeToSend = Arrays.copyOf(String.valueOf(toSend.length).getBytes(StandardCharsets.US_ASCII), 32);
             outStream.write(sizeToSend, 0, 32);
             outStream.write(toSend);
             outStream.flush();
             readFromSocket();
+            return true;
         } catch (IOException u) {
             FTPClientUI.addToLog(u.getMessage());
             u.printStackTrace();
         }
+        return false;
     }
 
     /**
@@ -71,12 +74,21 @@ public class FTPClient {
             while (socket.isConnected()) {
                 try {
                     FTPTransferObject readObject = readObjectFromStream();
-                    tree = TreeItemSerialisation.deserialize(readObject.getAdditionalData());
+                    if(readObject.getAdditionalData()!=null) {
+                        tree = TreeItemSerialisation.deserialize(readObject.getAdditionalData());
+                    }
                     FTPClientUI.addToLog("Server response: " + readObject.getResponseMessage() + "\n");
                     readFileFromStream(readObject);
+                    if(readObject.getResponseCode()==-1){
+                        connected=-1;
+                        return;
+                    }else {
+                        connected = 1;
+                    }
                 } catch (IOException | ClassNotFoundException e) {
-                    e.printStackTrace();
                     FTPClientUI.addToLog(e.getMessage());
+                    connected=0;
+                    return;
                 }
             }
 
@@ -98,6 +110,9 @@ public class FTPClient {
             try {
                 writeObjectToStream(pathClient, pathServer, command);
                 writeFileToStream(pathClient, !command.equals(FTPCommand.PUT));
+                if(command.equals(FTPCommand.CLOSE)) {
+                    socket.close();
+                }
             } catch (IOException e) {
                 FTPClientUI.addToLog(e.getMessage());
                 e.printStackTrace();
@@ -119,7 +134,6 @@ public class FTPClient {
      * @throws IOException If there is problem with object, if there is socket or stream problem
      */
     public void writeObjectToStream(File pathClient, File pathServer, FTPCommand command) throws IOException {
-        System.out.println("writeObjectToStream");
         FTPTransferObject objToSend = new FTPTransferObject(username, password, command, 0, null, null);
         objToSend.setPathServer(pathServer);
         objToSend.setPathClient(pathClient);
@@ -156,22 +170,31 @@ public class FTPClient {
      */
     public void writeFileToStream(File pathClient, boolean empty) throws IOException {
         if (empty || pathClient == null) {
-            //outStream.write(new byte[1]);
-            System.out.println("WRITTEN 0, RETURNING");
             return;
         }
-        System.out.println("writeFileToStream");
         byte[] myBuffer = new byte[512];
         BufferedInputStream bis = new BufferedInputStream(new FileInputStream(pathClient));
+        long currentTimeSeconds;
+        int read=0;
         while (true) {
+            currentTimeSeconds = System.currentTimeMillis() / 1000;
             int bytesRead = bis.read(myBuffer, 0, 512);
             if (bytesRead == -1) break;
             byte[] encrypted = AES.encrypt(myBuffer, key);
             assert encrypted != null;
             outStream.write(encrypted, 0, 528);
+            read+=528;
+            FTPClientUI.updateBar(((double) read - 1) / (double) pathClient.length(), 528/(((double) System.currentTimeMillis() / 1000) - currentTimeSeconds));
+            while(pause){
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
         }
+        FTPClientUI.updateBar(0, 0);
         outStream.flush();
-
         bis.close();
     }
 
@@ -183,18 +206,16 @@ public class FTPClient {
      * @throws ClassNotFoundException If there is problem with class
      */
     public FTPTransferObject readObjectFromStream() throws IOException, ClassNotFoundException {
-        System.out.println("readObjectFromStream");
         FTPTransferObject readObject;
         byte[] objInputArray;
         int num;
         byte[] b = new byte[16];
         num = inStream.read(b, 0, 16);
-        if (num == 0) return null; //TODO 1
+        if (num == 0) return null;
         int size = Integer.parseInt((new String(b, StandardCharsets.UTF_8)).trim());
-        System.out.println("READED SIZE " + size);
         objInputArray = new byte[size];
         try {
-            Thread.sleep(1000);
+            Thread.sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -202,11 +223,10 @@ public class FTPClient {
         while (size - readBytes > 0) {
             while(inStream.available()<Math.min(size - readBytes, 512)){
                 try {
-                    Thread.sleep(300);
+                    Thread.sleep(500);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                System.out.println("WAITING");
             }
             byte[] tmpArray = new byte[Math.min(size - readBytes, 512)];
             inStream.read(tmpArray, 0, Math.min(size - readBytes, 512));
@@ -228,14 +248,11 @@ public class FTPClient {
      * @throws IOException If there is problem with file or stream
      */
     public void readFileFromStream(FTPTransferObject readObject) throws IOException {
-        System.out.println("readFileFromStream");
         if (readObject.getFileSize() == 0) {
-            //int i=inStream.read(new byte[1]); //TODO 1
-            System.out.println("READED 0 FROM FILE, RETURNING: ");
             return;
         }
         if (readObject.getPathServer() != null) {
-            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(new File("C:\\Users\\Stefan.STEFAN-PC\\Desktop\\" + readObject.getName())));
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(new File(readObject.getName())));
 
             byte[] readBuffer = new byte[528];
             long fileSizeEnc = ((readObject.getFileSize() / 512) + 1) * 528;
@@ -245,11 +262,10 @@ public class FTPClient {
             while (fileSizeEnc > 0) {
                 while(inStream.available()<528){
                     try {
-                        Thread.sleep(300);
+                        Thread.sleep(500);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    System.out.println("WAITING");
                 }
                 currentTimeSeconds = System.currentTimeMillis() / 1000;
                 int num = inStream.read(readBuffer, 0, 528);
@@ -260,7 +276,14 @@ public class FTPClient {
                 read += 512;
                 fileSizeEnc -= 528;
                 fileSize -= 512;
-                FTPClientUI.updateBar(((double) read - 1) / (double) fileSize, (((double) System.currentTimeMillis() / 1000) - currentTimeSeconds) * 512);
+                FTPClientUI.updateBar(((double) read - 1) / ((double) fileSize), 512/(((double) System.currentTimeMillis() / 1000) - currentTimeSeconds));
+                while(pause){
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
             FTPClientUI.updateBar(0, 0);
             bos.flush();
@@ -305,8 +328,31 @@ public class FTPClient {
      *
      * @return Tree with files/folders
      */
-    public TreeItem<File> getTree() {
+    public TreeItem<FTPFile> getTree() {
         return tree;
     }
 
+    public boolean checkConnected() {
+        int iter=0;
+        while(connected==0){
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            if(connected==-1) return false;
+            if(connected==1) return true;
+            if(iter>20) break;
+            iter++;
+        }
+        return false;
+    }
+
+    public boolean getPause() {
+        return pause;
+    }
+
+    public void setPause(boolean p){
+        pause=p;
+    }
 }

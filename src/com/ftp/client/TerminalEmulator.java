@@ -1,6 +1,7 @@
 package com.ftp.client;
 
 import com.ftp.file.FTPCommand;
+import com.ftp.file.FTPFile;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TreeItem;
 
@@ -23,7 +24,7 @@ public class TerminalEmulator {
     private FTPClient client;
     private final TextArea console;
     public static String pwd = "";
-    public static TreeItem<File> treeItem;
+    public static TreeItem<FTPFile> treeItem;
     private int caretPosition;
     private String lastCommand = "";
 
@@ -58,26 +59,66 @@ public class TerminalEmulator {
             if(command.substring(2).trim().equals("--help")){
                 console.appendText("Usage: cd [path]");
             }else{
-                pwd += "/" + (command.substring(2).trim().replace("/", ""));
-                for (TreeItem<File> item : treeItem.getChildren()) {
-                    if (item.getValue().getName().equals(pwd.substring(pwd.lastIndexOf("/") + 1).trim())) {
-                        treeItem = item;
+                if(command.substring(2).trim().equals("..")){
+                    pwd=pwd.substring(0,pwd.lastIndexOf("/"));
+                    treeItem=treeItem.getParent();
+                }else {
+                    boolean found=false;
+                    String folderName = command.substring(2).trim().replace("/", "");
+                    for (TreeItem<FTPFile> item : treeItem.getChildren()) {
+                        if (item.getValue().getName().equals(folderName)) {
+                            treeItem = item;
+                            found=true;
+                        }
+                    }
+                    if(found){
+                        pwd += "/" + folderName;
+                    }else{
+                        console.appendText(command+": No such file or directory");
                     }
                 }
             }
         } else if (command.startsWith("get")) {
-            String file = treeItem.getValue() + File.separator + command.substring(3).trim();
+            String file = treeItem.getValue().getAbsolutePath() + File.separator + command.substring(3).trim();
             if(command.substring(3).trim().equals("--help")){
                 console.appendText("Usage: get [remote_file]");
             }else {
                 client.writeToSocket(null,new File(file), FTPCommand.GET);
+                FTPClientUI.addToLog("Downloading...\n");
             }
         } else if (command.startsWith("put")) {
             String file = command.substring(3).trim();
             if(file.trim().equals("--help")){
                 console.appendText("Usage: put [local_file]");
             }else {
-                client.writeToSocket(new File(file),treeItem.getValue(), FTPCommand.PUT);
+                FTPClientUI.addToLog("Uploading...\n");
+                client.writeToSocket(new File(file),new File(treeItem.getValue().getAbsolutePath()), FTPCommand.PUT);
+            }
+        }else if (command.startsWith("tree")) {
+            FTPClientUI.addToLog("Refreshing tree view...\n");
+            client.writeToSocket(null,null,FTPCommand.TREE);
+        }else if (command.startsWith("rmdir")) {
+            String file = command.substring(5).trim();
+            if(file.trim().equals("--help")){
+                console.appendText("Usage: rmdir [local_file] | [local_folder]");
+            }else {
+                FTPClientUI.addToLog("Removing selected file/folder...\n");
+                client.writeToSocket(null,new File(treeItem.getValue().getAbsolutePath()+ File.separator+file), FTPCommand.RMDIR);
+            }
+        }else if (command.startsWith("close")) {
+            client.writeToSocket(null,null,FTPCommand.CLOSE);
+            FTPClientUI.addToLog("Disconnected.\n");
+            caretPosition = console.getCaretPosition();
+            console.appendText("\n"+System.getProperty("user.name") + "@localhost:~$ ");
+            FTPClientUI.disconnect();
+            return;
+        }else if (command.startsWith("mkdir")) {
+            String file = command.substring(5).trim();
+            if(file.trim().equals("--help")){
+                console.appendText("Usage: rmdir [local_file] | [local_folder]");
+            }else {
+                FTPClientUI.addToLog("Creating folder...\n");
+                client.writeToSocket(null,new File(treeItem.getValue().getAbsolutePath()+ File.separator+file), FTPCommand.MKDIR);
             }
         } else if (command.startsWith("connect")) {
             try {
@@ -99,9 +140,11 @@ public class TerminalEmulator {
                         return e.trim().contains("-pw");
                     }).findFirst().get()) + 1);
                     if (client == null) {
+                        FTPClientUI.addToLog("Connecting...\n");
                         this.client = new FTPClient(usr, pw, host, port);
                         client.createSocket();
                         FTPClientUI.setClient(this.client);
+                        FTPClientUI.connect();
                     }
                 }
             } catch (Exception e) {
@@ -123,10 +166,10 @@ public class TerminalEmulator {
      */
     public void listFiles() throws IOException {
         StringBuilder output= new StringBuilder();
-        for (TreeItem<File> item : treeItem.getChildren()) {
+        for (TreeItem<FTPFile> item : treeItem.getChildren()) {
             output.append(String.format("%-12s%-20s%-10s%-15s%-20s\n", posixFilePermissions(item.getValue()),
-                    Files.getOwner(item.getValue().toPath()).toString().replace("(User)","")
-                            .substring(Files.getOwner(item.getValue().toPath()).toString().lastIndexOf("\\")+1),
+                    item.getValue().getOwner().replace("(User)","")
+                            .substring(item.getValue().getOwner().lastIndexOf("\\")+1),
                     (item.getValue().isDirectory()&&item.getValue().length()==0?"4096":item.getValue().length()),
                     (new SimpleDateFormat("MMM dd yyyy")).format(item.getValue().lastModified()),
                     item.getValue().getName()));
@@ -140,7 +183,7 @@ public class TerminalEmulator {
      * @param file File to be checked
      * @return String representation of file permissions
      */
-    public String posixFilePermissions(File file){
+    public String posixFilePermissions(FTPFile file){
         String perms=(file.canRead()?"r":"-")+(file.canWrite()?"w":"-")+(file.canExecute()?"x":"-");
         return getFileType(file)+perms+perms+perms;
     }
@@ -173,8 +216,8 @@ public class TerminalEmulator {
      * @param file File to be checked
      * @return String representation of file type
      */
-    public String getFileType(File file){
-        if(Files.isSymbolicLink(file.toPath())) return "s";
+    public String getFileType(FTPFile file){
+        if(file.isSymbolicLink()) return "s";
         if(file.isDirectory()) return "d";
         return "-";
     }
@@ -199,7 +242,7 @@ public class TerminalEmulator {
      */
     public void autoFill() {
         String toComplete=console.getText().substring(console.getText().lastIndexOf("$")+2).split(" ")[1].trim();
-        for(TreeItem<File> item:treeItem.getChildren()){
+        for(TreeItem<FTPFile> item:treeItem.getChildren()){
             if(item.getValue().getName().startsWith(toComplete)){
                 console.appendText(item.getValue().getName().substring(toComplete.length()));
                 break;

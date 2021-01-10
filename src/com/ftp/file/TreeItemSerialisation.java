@@ -16,12 +16,12 @@ public class TreeItemSerialisation {
      * @param root Byte array
      * @return Deserialized {@link TreeItem}
      */
-    public static TreeItem<File> deserialize(byte[] root){
-        TreeItem<File> root2=null;
+    public static TreeItem<FTPFile> deserialize(byte[] root){
+        TreeItem<FTPFile> root2=null;
         ObjectInputStream ois;
         try{
             ois=new ObjectInputStream(new ByteArrayInputStream(root));
-            root2 = (TreeItem<File>) ois.readObject();
+            root2 = (TreeItem<FTPFile>) ois.readObject();
         }catch (Exception e){
             e.printStackTrace();
         }
@@ -33,7 +33,7 @@ public class TreeItemSerialisation {
      * @param root {@link TreeItem} that needs to be serialized
      * @return Byte array
      */
-    public static byte[] serialize(TreeItem<File> root){
+    public static byte[] serialize(TreeItem<FTPFile> root){
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         ObjectOutputStream oos;
         try{
