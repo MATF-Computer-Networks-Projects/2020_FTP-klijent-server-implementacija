@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"com.ftp.client"},{"l":"com.ftp.file"},{"l":"com.ftp.server"}]
